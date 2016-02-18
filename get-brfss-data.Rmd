@@ -10,8 +10,8 @@ output:
 ## Overview
 
 Get the 2012-2014 datasets from http://www.cdc.gov/brfss, load into a data 
-table, and report file sizes and memory use along the way to track progress 
-and resource utilization.
+table, report file sizes and memory use, and save the data to a single TSV 
+file.
 
 ## Configure the time range in years
 
@@ -78,7 +78,7 @@ downloadDataFile <- function(datadir, datayear) {
     if (! file.exists(datafile)) {
         cat("Downloading data file for year", datayear, "...\n")
         download.file(dataurl, datafile, mode='wb')
-        cat("Completed at", Sys.time(), "\n")
+        cat("Completed at", format(Sys.time()), "\n")
     }
     
     # Report file size of downloaded file
@@ -161,13 +161,13 @@ brfss <- as.data.table(adply(.data=datayears, .margins=c(1),
 retval <- reportSize(brfss, "all years")
 ```
 
-## Write data to a CSV file
+## Write data to a TSV file
 
 ```{r warning=FALSE}
-csvfile <- paste(datadir, "brfss.csv", sep="/")
-write.table(x=brfss, file=csvfile, row.names=F, fileEncoding="UTF-8", 
-            sep=",", quote=T, qmethod="escape", eol="\n")
+tsvfile <- paste(datadir, "brfss_data.tsv", sep="/")
+write.table(x=brfss, file=tsvfile, row.names=FALSE, fileEncoding="UTF-8", 
+            sep="\t", quote=FALSE, na="\\N", eol="\n")
 
-# Report file size of CSV file
-retval <- reportFileSize(csvfile)
+# Report file size of TSV file
+retval <- reportFileSize(tsvfile)
 ```

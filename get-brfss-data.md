@@ -5,8 +5,8 @@ Brian High
 ## Overview
 
 Get the 2012-2014 datasets from http://www.cdc.gov/brfss, load into a data 
-table, and report file sizes and memory use along the way to track progress 
-and resource utilization.
+table, report file sizes and memory use, and save the data to a single TSV 
+file.
 
 ## Configure the time range in years
 
@@ -77,7 +77,7 @@ downloadDataFile <- function(datadir, datayear) {
     if (! file.exists(datafile)) {
         cat("Downloading data file for year", datayear, "...\n")
         download.file(dataurl, datafile, mode='wb')
-        cat("Completed at", Sys.time(), "\n")
+        cat("Completed at", format(Sys.time()), "\n")
     }
     
     # Report file size of downloaded file
@@ -92,13 +92,13 @@ retval <- sapply(datayears, function(x) downloadDataFile(datadir, x))
 
 ```
 ## Downloading data file for year 2012 ...
-## Completed at 1455747301 
+## Completed at 2016-02-18 07:17:00 
 ## Size of file LLCP2012XPT.ZIP is 91 MB 
 ## Downloading data file for year 2013 ...
-## Completed at 1455747305 
+## Completed at 2016-02-18 07:17:02 
 ## Size of file LLCP2013XPT.ZIP is 123 MB 
 ## Downloading data file for year 2014 ...
-## Completed at 1455747306 
+## Completed at 2016-02-18 07:17:03 
 ## Size of file LLCP2014XPT.ZIP is 68.9 MB
 ```
 
@@ -204,18 +204,18 @@ retval <- reportSize(brfss, "all years")
 ## Data table for all years contains 1432124 observations and 518 variables
 ```
 
-## Write data to a CSV file
+## Write data to a TSV file
 
 
 ```r
-csvfile <- paste(datadir, "brfss.csv", sep="/")
-write.table(x=brfss, file=csvfile, row.names=F, fileEncoding="UTF-8", 
-            sep=",", quote=T, qmethod="escape", eol="\n")
+tsvfile <- paste(datadir, "brfss_data.tsv", sep="/")
+write.table(x=brfss, file=tsvfile, row.names=FALSE, fileEncoding="UTF-8", 
+            sep="\t", quote=FALSE, na="\\N", eol="\n")
 
-# Report file size of CSV file
-retval <- reportFileSize(csvfile)
+# Report file size of TSV file
+retval <- reportFileSize(tsvfile)
 ```
 
 ```
-## Size of file ./data/brfss.csv is 2119.5 MB
+## Size of file ./data/brfss_data.tsv is 2087.5 MB
 ```
