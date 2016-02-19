@@ -105,13 +105,13 @@ ggplot(data=rs, aes(x=Education, y=Smokers, fill=Education)) +
 
 ## Smokers by Education Level and Year
 
-How has smoking changed from 2013 to 2014?
+How has smoking changed from 2012 to 2014?
 
 
 ```r
 sql <- "SELECT IYEAR AS Year, X_EDUCAG AS Education, count(USENOW3) AS Smokers
         FROM brfss 
-        WHERE (IYEAR = 2014 OR IYEAR = 2013)
+        WHERE (IYEAR = 2014 OR IYEAR = 2013 OR IYEAR = 2012)
               AND X_STATE = 53 
               AND (USENOW3 = 1 OR USENOW3 = 2) 
               AND X_EDUCAG <= 4 
@@ -180,13 +180,13 @@ ggplot(data=rs, aes(x=Education, y=Drinkers, fill=Education)) +
 
 ## Drinkers by Education Level and Year
 
-Let's see how drinking in 2013 compares to 2014.
+Let's see how drinking compares from 2012 to 2014.
 
 
 ```r
 sql <- "SELECT IYEAR AS Year, X_EDUCAG AS Education, count(DRNKANY5) AS Drinkers 
         FROM brfss 
-        WHERE (IYEAR = 2014 OR IYEAR = 2013)
+        WHERE (IYEAR = 2014 OR IYEAR = 2013 OR IYEAR = 2012)
               AND X_STATE = 53 
               AND DRNKANY5 = 1 
               AND X_EDUCAG <= 4 
@@ -227,7 +227,7 @@ sql <- "SELECT IYEAR as Year, count(USENOW3) AS Smokers
 rs <- dbGetQuery(con, sql)
 rs$Year <- factor(rs$Year)
 smokers <- rs
-head(smokers)
+tail(smokers)
 ```
 
 ```
@@ -254,7 +254,7 @@ sql <- "SELECT IYEAR as Year, count(DRNKANY5) AS Drinkers
 rs <- dbGetQuery(con, sql)
 rs$Year <- factor(rs$Year)
 drinkers <- rs
-head(drinkers)
+tail(drinkers)
 ```
 
 ```
@@ -271,7 +271,7 @@ We can compare smokers and drinkers by merging the two datasets.
 
 ```r
 consumers <- merge(smokers, drinkers, "Year")
-head(consumers)
+consumers
 ```
 
 ```
