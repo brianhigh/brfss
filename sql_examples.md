@@ -7,7 +7,7 @@ Brian High
 This is a demo of some basic SQL `SELECT` queries using BRFSS data 
 from: http://www.cdc.gov/brfss/. 
 
-Only one table is used, so we will not need and "JOIN" statements. 
+Only one table is used, so we will not need any "JOIN" statements. 
 
 The CDC has provided a 
 [codebook](http://www.cdc.gov/brfss/annual_data/2013/pdf/codebook13_llcp.pdf) 
