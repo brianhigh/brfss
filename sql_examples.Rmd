@@ -46,16 +46,17 @@ We can check the `USENOW3` variable to see if the survey respondent is
 a smoker or not. A value of `1` (Every day) or `2` (Some days) means 
 "is a smoker". We will restrict the year (`IYEAR`) to `2014` and the 
 state (`X_STATE`) to `53` ("Washington"). The education level 
-(`X_IMPEDUC`) is an integer from 1-6.
+(`X_EDUCAG`) is an integer from 1-6.
 
 ```{r}
-sql <- "SELECT X_IMPEDUC AS Education, count(USENOW3) AS Smokers 
+sql <- "SELECT X_EDUCAG AS Education, count(USENOW3) AS Smokers 
         FROM brfss 
         WHERE IYEAR = 2014 
               AND X_STATE = 53 
               AND (USENOW3 = 1 OR USENOW3 = 2) 
-        GROUP BY X_IMPEDUC 
-        ORDER BY X_IMPEDUC DESC;"
+              AND X_EDUCAG <= 4 
+        GROUP BY X_EDUCAG 
+        ORDER BY X_EDUCAG DESC;"
 
 rs <- dbGetQuery(con, sql)
 rs
@@ -67,9 +68,9 @@ We will relabel the codes for education level to have meaningful labels. We will
 abbreviate the "Value Label" text descriptions from the codebook as follows.
 
 ```{r}
-edu.labels <- c("none", "elementary", "high school", "high school grad", 
-                "college", "college grad")
-rs$Education <- factor(rs$Education, levels=1:6, labels=edu.labels)
+edu.labels <- c("some school", "high school grad", 
+                "some college", "college grad")
+rs$Education <- factor(rs$Education, levels=1:4, labels=edu.labels)
 rs
 ```
 
@@ -90,16 +91,17 @@ dev.off()
 How has smoking changed from 2013 to 2014?
 
 ```{r}
-sql <- "SELECT IYEAR AS Year, X_IMPEDUC AS Education, count(USENOW3) AS Smokers
+sql <- "SELECT IYEAR AS Year, X_EDUCAG AS Education, count(USENOW3) AS Smokers
         FROM brfss 
         WHERE (IYEAR = 2014 OR IYEAR = 2013)
               AND X_STATE = 53 
               AND (USENOW3 = 1 OR USENOW3 = 2) 
-        GROUP BY IYEAR, X_IMPEDUC 
-        ORDER BY IYEAR, X_IMPEDUC DESC;"
+              AND X_EDUCAG <= 4 
+        GROUP BY IYEAR, X_EDUCAG 
+        ORDER BY IYEAR, X_EDUCAG DESC;"
 
 rs <- dbGetQuery(con, sql)
-rs$Education <- factor(rs$Education, levels=1:6, labels=edu.labels)
+rs$Education <- factor(rs$Education, levels=1:4, labels=edu.labels)
 ```
 
 ## Smokers by Education Level and Year
@@ -122,16 +124,17 @@ indicate if the survey respondent is currently a drinker or not. A value of
 `1` means "is a drinker". Again, we will just look at Washington state in 2013.
 
 ```{r}
-sql <- "SELECT X_IMPEDUC AS Education, count(DRNKANY5) AS Drinkers 
+sql <- "SELECT X_EDUCAG AS Education, count(DRNKANY5) AS Drinkers 
         FROM brfss 
         WHERE IYEAR = 2014
               AND X_STATE = 53 
               AND DRNKANY5 = 1 
-        GROUP BY X_IMPEDUC 
-        ORDER BY X_IMPEDUC DESC;"
+              AND X_EDUCAG <= 4 
+        GROUP BY X_EDUCAG 
+        ORDER BY X_EDUCAG DESC;"
 
 rs <- dbGetQuery(con, sql)
-rs$Education <- factor(rs$Education, levels=1:6, labels=edu.labels)
+rs$Education <- factor(rs$Education, levels=1:4, labels=edu.labels)
 rs
 ```
 
@@ -151,16 +154,17 @@ dev.off()
 Let's see how drinking in 2013 compares to 2014.
 
 ```{r}
-sql <- "SELECT IYEAR AS Year, X_IMPEDUC AS Education, count(DRNKANY5) AS Drinkers 
+sql <- "SELECT IYEAR AS Year, X_EDUCAG AS Education, count(DRNKANY5) AS Drinkers 
         FROM brfss 
         WHERE (IYEAR = 2014 OR IYEAR = 2013)
               AND X_STATE = 53 
               AND DRNKANY5 = 1 
-        GROUP BY IYEAR, X_IMPEDUC 
-        ORDER BY IYEAR, X_IMPEDUC DESC;"
+              AND X_EDUCAG <= 4 
+        GROUP BY IYEAR, X_EDUCAG 
+        ORDER BY IYEAR, X_EDUCAG DESC;"
 
 rs <- dbGetQuery(con, sql)
-rs$Education <- factor(rs$Education, levels=1:6, labels=edu.labels)
+rs$Education <- factor(rs$Education, levels=1:4, labels=edu.labels)
 ```
 
 ## Drinkers by Education Level and Year
