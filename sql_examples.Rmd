@@ -1,7 +1,7 @@
 ---
-title: "Smokers and Drinkers"
+title: "Smoking and Drinking"
 author: "Brian High"
-date: "2/18/2016"
+date: "2/19/2016"
 output: 
     ioslides_presentation:
         fig_width: 8.5
@@ -11,15 +11,21 @@ output:
         cache: true
 ---
 
-## SQL Examples: Smokers and Drinkers
+## SQL Examples: Smoking and Drinking
 
 This is a demo of some basic SQL `SELECT` queries using BRFSS data 
 from: http://www.cdc.gov/brfss/. 
 
 Only one table is used, so we will not need any "JOIN" statements. 
 
+We have downloaded the data for each respondent for the years 2005 through 2014.
+
+The data is stored in a MySQL database with 4379516 rows and 999 columns. When
+exported as a TSV file, this file is 13 GB. This dataset will be too large to
+fit in RAM memory for most desktop and laptop computers.
+
 The CDC has provided a 
-[codebook](http://www.cdc.gov/brfss/annual_data/2013/pdf/codebook13_llcp.pdf) 
+[codebook](http://www.cdc.gov/brfss/annual_data/2014/pdf/codebook14_llcp.pdf) 
 for use in understanding variables and codes.
 
 In particular, we will focus on tobacco use and alcohol consumption in 
@@ -60,36 +66,46 @@ state (`X_STATE`) to `53` ("Washington"). The education level
 (`X_EDUCAG`) is an integer from 1-4 (or 9 meaning "Don't know", "Missing", etc.).
 
 ```{r}
-sql <- "SELECT X_EDUCAG AS Education, count(USENOW3) AS Smokers 
+sql <- "SELECT COUNT(*) AS TOTAL, 
+        X_EDUCAG AS Education, 
+        COUNT(IF(USENOW3 = 1 OR USENOW3 = 2, 1, NULL)) AS Smokers 
         FROM brfss 
         WHERE IYEAR = 2014 
               AND X_STATE = 53 
-              AND (USENOW3 = 1 OR USENOW3 = 2) 
               AND X_EDUCAG <= 4 
         GROUP BY X_EDUCAG 
         ORDER BY X_EDUCAG DESC;"
 
 rs <- dbGetQuery(con, sql)
-rs
+```
+
+## Smoking Prevalence by Education Level
+
+We then use functions from the package `dplyr` to calculate smoking prevalence.
+
+```{r message=FALSE}
+library(dplyr)
+rs %>% group_by(Education) %>% mutate(Smoking.Prevalence=Smokers/TOTAL) -> smokers
+smokers
 ```
 
 ## Relabel Education Level
 
-We will relabel the codes for education level to have meaningful labels. We will
+Now, we relabel the codes for education level to have meaningful labels. We 
 abbreviate the "Value Label" text descriptions from the codebook as follows.
 
 ```{r}
 edu.labels <- c("some school", "high school grad", 
                 "some college", "college grad")
-rs$Education <- factor(rs$Education, levels=1:4, labels=edu.labels)
-rs
+smokers$Education <- factor(smokers$Education, levels=1:4, labels=edu.labels)
+smokers
 ```
 
-## Smokers by Education Level
+## Smoking Prevalence by Education Level
 
-```{r}
+```{r message=FALSE}
 library(ggplot2)
-ggplot(data=rs, aes(x=Education, y=Smokers, fill=Education)) +
+ggplot(data=smokers, aes(x=Education, y=Smoking.Prevalence, fill=Education)) +
     geom_bar(stat="identity")
 ```
 
@@ -97,29 +113,32 @@ ggplot(data=rs, aes(x=Education, y=Smokers, fill=Education)) +
 dev.off()
 ```
 
-## Smokers by Education Level and Year
+## Count Smokers by Education and Year
 
-How has smoking changed from 2012 to 2014?
+How has smoking changed from 2011 to 2014?
 
-```{r}
-sql <- "SELECT IYEAR AS Year, X_EDUCAG AS Education, count(USENOW3) AS Smokers
+```{r message=FALSE}
+sql <- "SELECT IYEAR AS Year, COUNT(*) AS TOTAL, 
+        X_EDUCAG AS Education, 
+        COUNT(IF(USENOW3 = 1 OR USENOW3 = 2, 1, NULL)) AS Smokers
         FROM brfss 
-        WHERE (IYEAR >= 2012 AND IYEAR <= 2014)
+        WHERE (IYEAR >= 2011 AND IYEAR <= 2014)
               AND X_STATE = 53 
-              AND (USENOW3 = 1 OR USENOW3 = 2) 
               AND X_EDUCAG <= 4 
         GROUP BY IYEAR, X_EDUCAG 
         ORDER BY IYEAR, X_EDUCAG DESC;"
 
 rs <- dbGetQuery(con, sql)
-rs$Education <- factor(rs$Education, levels=1:4, labels=edu.labels)
+rs %>% group_by(Year, Education) %>% 
+    mutate(Smoking.Prevalence=Smokers/TOTAL) -> smokers
 ```
 
-## Smokers by Education Level and Year
+## Smoking by Education and Year
 
-```{r}
-rs$Year <- factor(rs$Year)
-ggplot(data=rs, aes(x=Education, y=Smokers, fill=Year)) +
+```{r message=FALSE}
+smokers$Education <- factor(smokers$Education, levels=1:4, labels=edu.labels)
+smokers$Year <- factor(smokers$Year)
+ggplot(data=smokers, aes(x=Education, y=Smoking.Prevalence, fill=Year)) +
     geom_bar(stat="identity", position=position_dodge(), colour="black")
 ```
 
@@ -132,27 +151,37 @@ dev.off()
 The `DRNKANY5` variable stores a value indicating if the survey respondent has 
 consumed an alcoholic drink in the past 30 days. We will use this value to 
 indicate if the survey respondent is currently a drinker or not. A value of
-`1` means "is a drinker". Again, we will just look at Washington state in 2013.
+`1` means "is a drinker". Again, we will just look at Washington state in 2014.
 
 ```{r}
-sql <- "SELECT X_EDUCAG AS Education, count(DRNKANY5) AS Drinkers 
+sql <- "SELECT COUNT(*) AS TOTAL, 
+        X_EDUCAG AS Education, 
+        COUNT(IF(DRNKANY5 = 1, 1, NULL)) AS Drinkers 
         FROM brfss 
         WHERE IYEAR = 2014
               AND X_STATE = 53 
-              AND DRNKANY5 = 1 
               AND X_EDUCAG <= 4 
         GROUP BY X_EDUCAG 
         ORDER BY X_EDUCAG DESC;"
 
 rs <- dbGetQuery(con, sql)
-rs$Education <- factor(rs$Education, levels=1:4, labels=edu.labels)
-rs
 ```
 
-## Drinkers by Education Level
+## Drinking Prevalence by Education Level
+
+Again, using `dplyr`, we can calculate drinking prevalence.
 
 ```{r}
-ggplot(data=rs, aes(x=Education, y=Drinkers, fill=Education)) +
+rs %>% group_by(Education) %>% 
+    mutate(Drinking.Prevalence=Drinkers/TOTAL) -> drinkers
+drinkers$Education <- factor(drinkers$Education, levels=1:4, labels=edu.labels)
+drinkers
+```
+
+## Drinking Prevalence by Education Level
+
+```{r}
+ggplot(data=drinkers, aes(x=Education, y=Drinking.Prevalence, fill=Education)) +
     geom_bar(stat="identity")
 ```
 
@@ -160,29 +189,32 @@ ggplot(data=rs, aes(x=Education, y=Drinkers, fill=Education)) +
 dev.off()
 ```
 
-## Drinkers by Education Level and Year
+## Count Drinkers by Education and Year
 
-Let's see how drinking compares from 2012 to 2014.
+Let's see how drinking compares from 2011 to 2014.
 
 ```{r}
-sql <- "SELECT IYEAR AS Year, X_EDUCAG AS Education, count(DRNKANY5) AS Drinkers 
+sql <- "SELECT IYEAR AS Year, COUNT(*) AS TOTAL, 
+        X_EDUCAG AS Education, 
+        COUNT(IF(DRNKANY5 = 1, 1, NULL)) AS Drinkers 
         FROM brfss 
-        WHERE (IYEAR >= 2012 AND IYEAR <= 2014)
+        WHERE (IYEAR >= 2011 AND IYEAR <= 2014)
               AND X_STATE = 53 
-              AND DRNKANY5 = 1 
               AND X_EDUCAG <= 4 
         GROUP BY IYEAR, X_EDUCAG 
         ORDER BY IYEAR, X_EDUCAG DESC;"
 
 rs <- dbGetQuery(con, sql)
-rs$Education <- factor(rs$Education, levels=1:4, labels=edu.labels)
+rs %>% group_by(Year, Education) %>% 
+    mutate(Drinking.Prevalence=Drinkers/TOTAL) -> drinkers
 ```
 
-## Drinkers by Education Level and Year
+## Drinking by Education and Year
 
 ```{r}
-rs$Year <- factor(rs$Year)
-ggplot(data=rs, aes(x=Education, y=Drinkers, fill=Year)) +
+drinkers$Education <- factor(drinkers$Education, levels=1:4, labels=edu.labels)
+drinkers$Year <- factor(drinkers$Year)
+ggplot(data=drinkers, aes(x=Education, y=Drinking.Prevalence, fill=Year)) +
     geom_bar(stat="identity", position=position_dodge(), colour="black")
 ```
 
@@ -190,33 +222,35 @@ ggplot(data=rs, aes(x=Education, y=Drinkers, fill=Year)) +
 dev.off()
 ```
 
-## Smokers and Drinkers by Year
+## Smoking and Drinking by Year
 
 We can compare the number of smokers and drinkers by year in one query using
 the SQL `IF()` function within our `COUNT()` function.
 
 ```{r}
-sql <- "SELECT IYEAR as Year,
+sql <- "SELECT IYEAR as Year, COUNT(*) AS TOTAL,
         COUNT(IF(USENOW3 = 1 OR USENOW3 = 2, 1, NULL)) AS Smokers,
         COUNT(IF(DRNKANY5 = 1, 1, NULL)) AS Drinkers
         FROM brfss
-        WHERE IYEAR <= 2014 AND X_STATE = 53
+        WHERE IYEAR >= 2011 AND IYEAR <= 2014 AND X_STATE = 53
         GROUP BY IYEAR 
         ORDER BY IYEAR;"
 
 rs <- dbGetQuery(con, sql)
+rs %>% group_by(Year) %>%
+    mutate(Smoking=Smokers/TOTAL, Drinking=Drinkers/TOTAL) -> consumers
 ```
 
 This saves us from otherwise having to perform two separate queries and then 
-having to merge the results. SQL does all of this for us.
+having to merge the results. We had SQL calculate yearly totals of survey
+respondents to use for calculating smoking and drinking prevalence.
 
-## Smokers and Drinkers by Year
+## Smoking and Drinking by Year
 
-Now we can show the smokers and drinkers side-by-side in "wide" format.
+Now we can show smoking and drinking prevalenve side-by-side in "wide" format.
 
 ```{r}
-rs$Year <- factor(rs$Year)
-consumers <- rs
+consumers$Year <- factor(consumers$Year)
 consumers
 ```
 
@@ -228,14 +262,16 @@ we will need to convert the data structure from "wide" to "long" format. The
 
 ```{r}
 library(tidyr)
-consumers <- gather(consumers, key=Type, value=Count, -Year)
-head(consumers)
+consumers <- consumers %>% 
+    select(Year, Smoking, Drinking) %>% 
+    gather(key=Factor, value=Prevalence, -Year)
+consumers
 ```
 
-## Smokers and Drinkers by Year
+## Smoking and Drinking by Year
 
 ```{r}
-ggplot(data=consumers, aes(x=Year, y=Count, group=Type, color=Type)) +
+ggplot(data=consumers, aes(x=Year, y=Prevalence, group=Factor, color=Factor)) +
     geom_line()
 ```
 
