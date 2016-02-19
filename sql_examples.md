@@ -111,7 +111,7 @@ How has smoking changed from 2012 to 2014?
 ```r
 sql <- "SELECT IYEAR AS Year, X_EDUCAG AS Education, count(USENOW3) AS Smokers
         FROM brfss 
-        WHERE (IYEAR = 2014 OR IYEAR = 2013 OR IYEAR = 2012)
+        WHERE (IYEAR >= 2012 AND IYEAR <= 2014)
               AND X_STATE = 53 
               AND (USENOW3 = 1 OR USENOW3 = 2) 
               AND X_EDUCAG <= 4 
@@ -186,7 +186,7 @@ Let's see how drinking compares from 2012 to 2014.
 ```r
 sql <- "SELECT IYEAR AS Year, X_EDUCAG AS Education, count(DRNKANY5) AS Drinkers 
         FROM brfss 
-        WHERE (IYEAR = 2014 OR IYEAR = 2013 OR IYEAR = 2012)
+        WHERE (IYEAR >= 2012 AND IYEAR <= 2014)
               AND X_STATE = 53 
               AND DRNKANY5 = 1 
               AND X_EDUCAG <= 4 
