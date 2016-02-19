@@ -44,7 +44,7 @@ We can check the `USENOW3` variable to see if the survey respondent is
 a smoker or not. A value of `1` (Every day) or `2` (Some days) means 
 "is a smoker". We will restrict the year (`IYEAR`) to `2014` and the 
 state (`X_STATE`) to `53` ("Washington"). The education level 
-(`X_EDUCAG`) is an integer from 1-6.
+(`X_EDUCAG`) is an integer from 1-4 (or 9 meaning "Don't know", "Missing", etc.).
 
 
 ```r
