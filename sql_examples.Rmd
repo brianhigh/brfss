@@ -3,15 +3,12 @@ title: "BRFSS SQL Examples"
 author: "Brian High"
 date: "2/18/2016"
 output: 
-    html_document:
-        keep_md: true
-        fig_width: 9
-        fig_height: 4
     ioslides_presentation:
-        fig_width: 9
-        fig_height: 4
+        fig_width: 8.5
+        fig_height: 3.5
         keep_md: yes
         smaller: yes
+        cache: true
 ---
 
 ## SQL Examples
@@ -42,17 +39,16 @@ con <- dbConnect(MySQL(),
 
 ## Count Smokers by Education Level
 
-The `USENOW3` variable stores a value indicating if the survey respondent is
-currently a smoker or not. A value of `1` (Every day) or `2` (Some days) means 
-"is a smoker". We will restrict the year (`IYEAR`) to `2013` and the 
-state (`X_STATE`) to `53`, which is "Washington". The education level 
-(`_IMPEDUC`), an integer from 1-6, is stored in the database as `X_IMPEDUC`.
+We can check the `USENOW3` variable to see if the survey respondent is
+a smoker or not. A value of `1` (Every day) or `2` (Some days) means 
+"is a smoker". We will restrict the year (`IYEAR`) to `2014` and the 
+state (`X_STATE`) to `53` ("Washington"). The education level 
+(`X_IMPEDUC`) is an integer from 1-6.
 
 ```{r}
-sql <- "SELECT X_IMPEDUC AS Education, 
-               count(USENOW3) AS Smokers 
+sql <- "SELECT X_IMPEDUC AS Education, count(USENOW3) AS Smokers 
         FROM brfss 
-        WHERE IYEAR = 2013
+        WHERE IYEAR = 2014 
               AND X_STATE = 53 
               AND (USENOW3 = 1 OR USENOW3 = 2) 
         GROUP BY X_IMPEDUC 
@@ -68,19 +64,51 @@ We will relabel the codes for education level to have meaningful labels. We will
 abbreviate the "Value Label" text descriptions from the codebook as follows.
 
 ```{r}
-edu.labels <- c("none", "elementary", "some high school", "high school grad", 
-                "some college", "college grad")
+edu.labels <- c("none", "elementary", "high school", "high school grad", 
+                "college", "college grad")
 rs$Education <- factor(rs$Education, levels=1:6, labels=edu.labels)
 rs
 ```
 
-## Histogram of Smokers by Education Level
+## Smokers by Education Level
 
 ```{r}
 library(ggplot2)
-
 ggplot(data=rs, aes(x=Education, y=Smokers, fill=Education)) +
     geom_bar(stat="identity")
+```
+
+```{r echo=F, results='hide'}
+dev.off()
+```
+
+## Smokers by Education Level and Year
+
+How has smoking changed from 2013 to 2014?
+
+```{r}
+sql <- "SELECT IYEAR AS Year, X_IMPEDUC AS Education, count(USENOW3) AS Smokers
+        FROM brfss 
+        WHERE (IYEAR = 2014 OR IYEAR = 2013)
+              AND X_STATE = 53 
+              AND (USENOW3 = 1 OR USENOW3 = 2) 
+        GROUP BY IYEAR, X_IMPEDUC 
+        ORDER BY IYEAR, X_IMPEDUC DESC;"
+
+rs <- dbGetQuery(con, sql)
+rs$Education <- factor(rs$Education, levels=1:6, labels=edu.labels)
+```
+
+## Smokers by Education Level and Year
+
+```{r}
+rs$Year <- factor(rs$Year)
+ggplot(data=rs, aes(x=Education, y=Smokers, fill=Year)) +
+    geom_bar(stat="identity", position=position_dodge(), colour="black")
+```
+
+```{r echo=F, results='hide'}
+dev.off()
 ```
 
 ## Count Drinkers by Education Level
@@ -91,10 +119,9 @@ indicate if the survey respondent is currently a drinker or not. A value of
 `1` means "is a drinker". Again, we will just look at Washington state in 2013.
 
 ```{r}
-sql <- "SELECT X_IMPEDUC AS Education, 
-               count(DRNKANY5) AS Drinkers 
+sql <- "SELECT X_IMPEDUC AS Education, count(DRNKANY5) AS Drinkers 
         FROM brfss 
-        WHERE IYEAR = 2013
+        WHERE IYEAR = 2014
               AND X_STATE = 53 
               AND DRNKANY5 = 1 
         GROUP BY X_IMPEDUC 
@@ -105,11 +132,44 @@ rs$Education <- factor(rs$Education, levels=1:6, labels=edu.labels)
 rs
 ```
 
-## Histogram of Drinkers by Education Level
+## Drinkers by Education Level
 
 ```{r}
 ggplot(data=rs, aes(x=Education, y=Drinkers, fill=Education)) +
     geom_bar(stat="identity")
+```
+
+```{r echo=F, results='hide'}
+dev.off()
+```
+
+## Drinkers by Education Level and Year
+
+Let's see how drinking has changed from 2013 to 2014.
+
+```{r}
+sql <- "SELECT IYEAR AS Year, X_IMPEDUC AS Education, count(DRNKANY5) AS Drinkers 
+        FROM brfss 
+        WHERE (IYEAR = 2014 OR IYEAR = 2013)
+              AND X_STATE = 53 
+              AND DRNKANY5 = 1 
+        GROUP BY IYEAR, X_IMPEDUC 
+        ORDER BY IYEAR, X_IMPEDUC DESC;"
+
+rs <- dbGetQuery(con, sql)
+rs$Education <- factor(rs$Education, levels=1:6, labels=edu.labels)
+```
+
+## Drinkers by Education Level and Year
+
+```{r}
+rs$Year <- factor(rs$Year)
+ggplot(data=rs, aes(x=Education, y=Drinkers, fill=Year)) +
+    geom_bar(stat="identity", position=position_dodge(), colour="black")
+```
+
+```{r echo=F, results='hide'}
+dev.off()
 ```
 
 ## Smokers by Year
@@ -117,8 +177,7 @@ ggplot(data=rs, aes(x=Education, y=Drinkers, fill=Education)) +
 We can get a count of all smokers by year to look for annual trends.
 
 ```{r}
-sql <- "SELECT IYEAR as Year, 
-               count(USENOW3) AS Smokers 
+sql <- "SELECT IYEAR as Year, count(USENOW3) AS Smokers 
         FROM brfss 
         WHERE IYEAR <= 2014 
               AND X_STATE = 53 
@@ -126,11 +185,10 @@ sql <- "SELECT IYEAR as Year,
         GROUP BY IYEAR 
         ORDER BY IYEAR;"
 
-
 rs <- dbGetQuery(con, sql)
 rs$Year <- factor(rs$Year)
 smokers <- rs
-smokers
+head(smokers)
 ```
 
 ## Drinkers by Year
@@ -138,8 +196,7 @@ smokers
 The trend for drinkers is similar, though there are many more drinkers.
 
 ```{r}
-sql <- "SELECT IYEAR as Year, 
-               count(DRNKANY5) AS Drinkers 
+sql <- "SELECT IYEAR as Year, count(DRNKANY5) AS Drinkers 
         FROM brfss 
         WHERE IYEAR <= 2014
               AND X_STATE = 53 
@@ -150,22 +207,39 @@ sql <- "SELECT IYEAR as Year,
 rs <- dbGetQuery(con, sql)
 rs$Year <- factor(rs$Year)
 drinkers <- rs
-drinkers
+head(drinkers)
 ```
 
-## Line Plot of Smokers and Drinkers by Year
+## Smokers and Drinkers by Year
 
-We can compare smokers and drinkers with a line plot.
+We can compare smokers and drinkers by merging the two datasets.
 
 ```{r}
 consumers <- merge(smokers, drinkers, "Year")
+head(consumers)
+```
 
+## Smokers and Drinkers in Long Format
+
+To facilitate plotting, we will want to group by consumption type. To do this,
+we will need to convert the data structure from wide to long format. The
+`gather()` function of the `tidyr` package makes this easy.
+
+```{r}
 library(tidyr)
 consumers <- gather(consumers, key=Type, value=Count, -Year)
-consumers
+head(consumers)
+```
 
+## Smokers and Drinkers by Year
+
+```{r}
 ggplot(data=consumers, aes(x=Year, y=Count, group=Type, color=Type)) +
     geom_line()
+```
+
+```{r echo=F, results='hide'}
+dev.off()
 ```
 
 ## Close Database Connection
