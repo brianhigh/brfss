@@ -1,8 +1,8 @@
-# BRFSS SQL Examples
+# Smokers and Drinkers
 Brian High  
 2/18/2016  
 
-## SQL Examples
+## SQL Examples: Smokers and Drinkers
 
 This is a demo of some basic SQL `SELECT` queries using BRFSS data 
 from: http://www.cdc.gov/brfss/. 
@@ -13,7 +13,7 @@ The CDC has provided a
 [codebook](http://www.cdc.gov/brfss/annual_data/2013/pdf/codebook13_llcp.pdf) 
 for use in understanding variables and codes.
 
-In particular, we will be focusing on tobacco smoking and alcohol drinking in 
+In particular, we will focus on tobacco use and alcohol consumption in 
 the state of Washington.
 
 ## Connect to MySQL Database
@@ -210,67 +210,35 @@ ggplot(data=rs, aes(x=Education, y=Drinkers, fill=Year)) +
 
 
 
-## Smokers by Year
+## Smokers and Drinkers by Year
 
-We can get a count of all smokers by year to look for annual trends.
+We can compare the number of smokers and drinkers by year in one query using
+the SQL `IF()` function within our `COUNT()` function.
 
 
 ```r
-sql <- "SELECT IYEAR as Year, count(USENOW3) AS Smokers 
-        FROM brfss 
-        WHERE IYEAR <= 2014 
-              AND X_STATE = 53 
-              AND (USENOW3 = 1 OR USENOW3 = 2) 
+sql <- "SELECT IYEAR as Year,
+        COUNT(IF(USENOW3 = 1 OR USENOW3 = 2, 1, NULL)) AS Smokers,
+        COUNT(IF(DRNKANY5 = 1, 1, NULL)) AS Drinkers
+        FROM brfss
+        WHERE IYEAR <= 2014 AND X_STATE = 53
         GROUP BY IYEAR 
         ORDER BY IYEAR;"
 
 rs <- dbGetQuery(con, sql)
-rs$Year <- factor(rs$Year)
-smokers <- rs
-tail(smokers)
 ```
 
-```
-##   Year Smokers
-## 1 2012     388
-## 2 2013     283
-## 3 2014     233
-```
-
-## Drinkers by Year
-
-The trend for drinkers is similar, though there are many more drinkers.
-
-
-```r
-sql <- "SELECT IYEAR as Year, count(DRNKANY5) AS Drinkers 
-        FROM brfss 
-        WHERE IYEAR <= 2014
-              AND X_STATE = 53 
-              AND DRNKANY5 = 1 
-        GROUP BY IYEAR 
-        ORDER BY IYEAR;"
-
-rs <- dbGetQuery(con, sql)
-rs$Year <- factor(rs$Year)
-drinkers <- rs
-tail(drinkers)
-```
-
-```
-##   Year Drinkers
-## 1 2012     8976
-## 2 2013     6420
-## 3 2014     5819
-```
+This saves us from otherwise having to perform two separate queries and then 
+having to merge the results. SQL does all of this for us.
 
 ## Smokers and Drinkers by Year
 
-We can compare smokers and drinkers by merging the two datasets.
+Now we can show the smokers and drinkers side-by-side in "wide" format.
 
 
 ```r
-consumers <- merge(smokers, drinkers, "Year")
+rs$Year <- factor(rs$Year)
+consumers <- rs
 consumers
 ```
 
@@ -284,7 +252,7 @@ consumers
 ## Smokers and Drinkers in Long Format
 
 To facilitate plotting, we will want to group by consumption type. To do this,
-we will need to convert the data structure from wide to long format. The
+we will need to convert the data structure from "wide" to "long" format. The
 `gather()` function of the `tidyr` package makes this easy.
 
 
@@ -312,7 +280,7 @@ ggplot(data=consumers, aes(x=Year, y=Count, group=Type, color=Type)) +
     geom_line()
 ```
 
-![](sql_examples_files/figure-html/unnamed-chunk-19-1.png)\
+![](sql_examples_files/figure-html/unnamed-chunk-18-1.png)\
 
 
 
