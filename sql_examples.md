@@ -24,19 +24,25 @@ account.
 
 ```r
 library(RMySQL)
-```
 
-```
-## Loading required package: DBI
-```
-
-```r
 con <- dbConnect(MySQL(), 
                  host="localhost", 
                  username="anonymous", 
                  password="Ank7greph-", 
                  dbname="brfss")
 ```
+
+It's generally a *bad* idea to put your connection credentials in your script,
+and an even *worse* idea to publish these on Github. *Don't be like me!*
+
+
+```r
+if (file.exists("con.R")) source("con.R")
+```
+
+A lesser evil is to put them in a separate file that you keep secure and private.
+
+Even better would be to configure your system to prompt you for the password.
 
 ## Count Smokers by Education Level
 
@@ -99,7 +105,7 @@ ggplot(data=rs, aes(x=Education, y=Smokers, fill=Education)) +
     geom_bar(stat="identity")
 ```
 
-![](sql_examples_files/figure-html/unnamed-chunk-4-1.png)\
+![](sql_examples_files/figure-html/unnamed-chunk-5-1.png)\
 
 
 
@@ -131,7 +137,7 @@ ggplot(data=rs, aes(x=Education, y=Smokers, fill=Year)) +
     geom_bar(stat="identity", position=position_dodge(), colour="black")
 ```
 
-![](sql_examples_files/figure-html/unnamed-chunk-7-1.png)\
+![](sql_examples_files/figure-html/unnamed-chunk-8-1.png)\
 
 
 
@@ -174,7 +180,7 @@ ggplot(data=rs, aes(x=Education, y=Drinkers, fill=Education)) +
     geom_bar(stat="identity")
 ```
 
-![](sql_examples_files/figure-html/unnamed-chunk-10-1.png)\
+![](sql_examples_files/figure-html/unnamed-chunk-11-1.png)\
 
 
 
@@ -206,7 +212,7 @@ ggplot(data=rs, aes(x=Education, y=Drinkers, fill=Year)) +
     geom_bar(stat="identity", position=position_dodge(), colour="black")
 ```
 
-![](sql_examples_files/figure-html/unnamed-chunk-13-1.png)\
+![](sql_examples_files/figure-html/unnamed-chunk-14-1.png)\
 
 
 
@@ -280,7 +286,7 @@ ggplot(data=consumers, aes(x=Year, y=Count, group=Type, color=Type)) +
     geom_line()
 ```
 
-![](sql_examples_files/figure-html/unnamed-chunk-18-1.png)\
+![](sql_examples_files/figure-html/unnamed-chunk-19-1.png)\
 
 
 

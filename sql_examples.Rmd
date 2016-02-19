@@ -30,7 +30,7 @@ the state of Washington.
 We will connect to the `localhost` and `brfss` database using an `anonymous` 
 account.
 
-```{r}
+```{r message=FALSE}
 library(RMySQL)
 
 con <- dbConnect(MySQL(), 
@@ -39,6 +39,17 @@ con <- dbConnect(MySQL(),
                  password="Ank7greph-", 
                  dbname="brfss")
 ```
+
+It's generally a *bad* idea to put your connection credentials in your script,
+and an even *worse* idea to publish these on Github. *Don't be like me!*
+
+```{r}
+if (file.exists("con.R")) source("con.R")
+```
+
+A lesser evil is to put them in a separate file that you keep secure and private.
+
+Even better would be to configure your system to prompt you for the password.
 
 ## Count Smokers by Education Level
 
