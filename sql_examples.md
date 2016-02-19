@@ -13,6 +13,9 @@ The CDC has provided a
 [codebook](http://www.cdc.gov/brfss/annual_data/2013/pdf/codebook13_llcp.pdf) 
 for use in understanding variables and codes.
 
+In particular, we will be focusing on tobacco smoking and alcohol drinking in 
+the state of Washington.
+
 ## Connect to MySQL Database
 
 We will connect to the `localhost` and `brfss` database using an `anonymous` 
@@ -178,7 +181,7 @@ ggplot(data=rs, aes(x=Education, y=Drinkers, fill=Education)) +
 
 ## Drinkers by Education Level and Year
 
-Let's see how drinking has changed from 2013 to 2014.
+Let's see how drinking in 2013 compares to 2014.
 
 
 ```r
