@@ -93,7 +93,7 @@ cat(sum(rs[1, c("Data_length", "Index_length")]) / 1024 / 1024 / 1024, "GB")
 ## 4.214142 GB
 ```
 
-## Count Respondents per Year
+## Count Respondents by Year
 
 Usually, aggregating functions like `COUNT()` are used with `GROUP BY`. Let's
 count the number of respondents per year in Washington state (`53`). `ORDER BY` 
