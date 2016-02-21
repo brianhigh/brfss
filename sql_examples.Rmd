@@ -80,7 +80,7 @@ rs <- dbGetQuery(con, sql)
 cat(ncol(rs), "columns")
 sql <- "SHOW TABLE STATUS IN brfss;"
 rs <- dbGetQuery(con, sql)
-cat(sum(rs[1, c("Data_length", "Index_length")]) / 1024 / 1024 / 1024, "GB")
+cat(sum(rs[1, c("Data_length", "Index_length")]) / (1024^3), "GB")
 ```
 
 ## Count Respondents by Year
@@ -283,7 +283,7 @@ sql <- "SELECT IYEAR AS Year, X_EDUCAG AS Education,
         COUNT(*) AS Respondents, 
         COUNT(IF(DRNKANY5 = 1, 1, NULL)) AS Drinkers 
         FROM brfss 
-        WHERE (IYEAR >= 2011 AND IYEAR <= 2014)
+        WHERE (IYEAR BETWEEN 2011 AND 2014)
               AND X_STATE = 53 
               AND X_EDUCAG <= 4 
         GROUP BY IYEAR, X_EDUCAG 
@@ -318,7 +318,7 @@ sql <- "SELECT IYEAR AS Year, X_EDUCAG AS Education,
         COUNT(IF(USENOW3 = 1 OR USENOW3 = 2, 1, NULL)) AS Smokers, 
         COUNT(IF(DRNKANY5 = 1, 1, NULL)) AS Drinkers 
         FROM brfss 
-        WHERE (IYEAR >= 2011 AND IYEAR <= 2014)
+        WHERE (IYEAR BETWEEN 2011 AND 2014)
               AND X_STATE = 53 
               AND X_EDUCAG <= 4 
         GROUP BY IYEAR, X_EDUCAG 
@@ -373,7 +373,10 @@ Now that you know how to query the database, compare other variables, such as:
 - Smoking and drinking by income (`X_INCOMG`) or race (`X_RACE`)
 - Binge drinking (`X_RFBING5`) by gender (`SEX`) or age (`X_AGE80`)
 - BMI category (`X_BMI5CAT`) and exercise (`EXERANY2`) or sleep (`SLEPTIM1`)
-- Internet use (`INTERNET`) and mental health (`MENTHLTH`) or ...
+- Health care access (`HLTHPLN1`) and household income (`INCOME2`)
+- Stress (`QLSTRES2`) and marital status (`MARITAL`)
+- Internet use (`INTERNET`) and mental health (`MENTHLTH`) 
+- Life satisfaction (`LSATISFY`) and social/emotional support (`EMTSUPRT`)
 - What are *you* curious about?
 
 ## Close Database Connection
