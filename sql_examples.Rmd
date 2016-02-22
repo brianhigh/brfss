@@ -1,13 +1,14 @@
 ---
 title: "Smoking and Drinking"
 author: "Brian High"
-date: "2/19/2016"
+date: "![CC BY-SA 4.0](cc_by-sa_4.png)"
 output: 
     ioslides_presentation:
         fig_width: 8.5
         fig_height: 3.5
         keep_md: yes
         smaller: yes
+        logo: logo_128.png
 ---
 
 ## SQL Examples: Smoking and Drinking
@@ -35,13 +36,24 @@ for use in understanding variables and codes.
 In particular, we will focus on tobacco use and alcohol consumption in 
 the state of Washington.
 
+## Install Packages and Set Options
 
-## Set Options
+Load the required R packages, installing as necessary.
 
-We will now set rendering options for this document.
+```{r, echo=TRUE, message=FALSE}
+for (pkg in c("knitr", "RMySQL", "dplyr", "ggplot2", "tidyr", "data.table")) {
+    if (! suppressWarnings(require(pkg, character.only=TRUE)) ) {
+        install.packages(pkg, repos="http://cran.fhcrc.org", dependencies=TRUE)
+        if (! suppressWarnings(require(pkg, character.only=TRUE)) ) {
+            stop(paste0(c("Can't load package: ", pkg, "!"), collapse = ""))
+        }
+    }
+}
+```
+
+Set `knitr` rendering options and the default number of digits for printing.
 
 ```{r set_options, echo=TRUE, message=FALSE}
-library(knitr)
 opts_chunk$set(tidy=FALSE, cache=TRUE)
 options(digits=4)
 ```
@@ -74,8 +86,7 @@ Even better would be to configure your system to prompt you for the password.
 
 ## Table Size
 
-You can find the number of rows and columns, as well as table and index size,
-with a few simple queries.
+Print the number of rows and columns, as well as table and index size.
 
 ```{r}
 sql <- "SELECT COUNT(*) AS rows FROM brfss;"
@@ -91,9 +102,8 @@ cat(sum(rs[1, c("Data_length", "Index_length")]) / (1024^3), "GB")
 
 ## Count Respondents by Year
 
-Usually, aggregating functions like `COUNT()` are used with `GROUP BY`. Let's
-count the number of respondents per year in Washington state (`53`). `ORDER BY` 
-is for sorting.
+Let's count (`COUNT`) the number of respondents per year (`GROUP BY`) in 
+Washington state (`X_STATE = 53`), sorting by year (`ORDER BY`).
 
 ```{r}
 sql <- "SELECT IYEAR AS Year, COUNT(*) AS Respondents 
@@ -101,14 +111,12 @@ sql <- "SELECT IYEAR AS Year, COUNT(*) AS Respondents
         WHERE X_STATE = 53 
         GROUP BY IYEAR 
         ORDER BY IYEAR;"
-rs <- dbGetQuery(con, sql)
-rs
+dbGetQuery(con, sql)
 ```
 
 ## Respondents per Education Level
 
-Since 2015 has very few respondents in our dataset, we will use as 2014 as
-the most recent year. To get a idea of our sample, we look at education level.
+Look at the number of respondents in 2014 and aggregate by education level.
 
 ```{r}
 sql <- "SELECT X_EDUCAG AS Education, COUNT(*) AS Respondents 
@@ -116,16 +124,15 @@ sql <- "SELECT X_EDUCAG AS Education, COUNT(*) AS Respondents
         WHERE IYEAR = 2014 AND X_STATE = 53 
         GROUP BY X_EDUCAG 
         ORDER BY X_EDUCAG;"
-rs <- dbGetQuery(con, sql)
-rs
+dbGetQuery(con, sql)
 ```
 
 The education level (`X_EDUCAG`) is an integer from 1-4 (or 9 meaning 
-"Don't know", "Missing", etc.). What trend do we see here?
+"Don't know", "Missing", etc.). Do we see a trend? Is our sample skewed?
 
 ## Count Smokers by Education Level
 
-We can check the `USENOW3` variable to see if the survey respondent is
+Use the `USENOW3` variable to see if the survey respondent is
 a smoker or not. A value of `1` (Every day) or `2` (Some days) means 
 "is a smoker".
 
@@ -133,18 +140,15 @@ a smoker or not. A value of `1` (Every day) or `2` (Some days) means
 sql <- "SELECT X_EDUCAG AS Education, 
         COUNT(USENOW3) AS Smokers 
         FROM brfss 
-        WHERE IYEAR = 2014 
-              AND X_STATE = 53 
-              AND X_EDUCAG <= 4 
+        WHERE IYEAR = 2014 AND X_STATE = 53 AND X_EDUCAG <= 4 
               AND (USENOW3 = 1 OR USENOW3 = 2) 
         GROUP BY X_EDUCAG 
         ORDER BY X_EDUCAG;"
-rs <- dbGetQuery(con, sql)
-rs
+dbGetQuery(con, sql)
 ```
 
-Since the number of respondents varies by education level, we will want to 
-calculate "prevalence" using respondent totals by education level.
+The number of respondents varies by education level, so we will 
+calculate "prevalence" as a fraction of respondents per education level.
 
 ## Count Smokers by Education Level
 
@@ -156,9 +160,7 @@ sql <- "SELECT X_EDUCAG AS Education,
         COUNT(*) AS Respondents, 
         COUNT(IF(USENOW3 = 1 OR USENOW3 = 2, 1, NULL)) AS Smokers 
         FROM brfss 
-        WHERE IYEAR = 2014 
-              AND X_STATE = 53 
-              AND X_EDUCAG <= 4 
+        WHERE IYEAR = 2014 AND X_STATE = 53 AND X_EDUCAG <= 4 
         GROUP BY X_EDUCAG 
         ORDER BY X_EDUCAG;"
 rs <- dbGetQuery(con, sql)

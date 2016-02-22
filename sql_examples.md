@@ -1,6 +1,6 @@
 # Smoking and Drinking
 Brian High  
-2/19/2016  
+![CC BY-SA 4.0](cc_by-sa_4.png)  
 
 ## SQL Examples: Smoking and Drinking
 
@@ -27,14 +27,26 @@ for use in understanding variables and codes.
 In particular, we will focus on tobacco use and alcohol consumption in 
 the state of Washington.
 
+## Install Packages and Set Options
 
-## Set Options
-
-We will now set rendering options for this document.
+Load the required R packages, installing as necessary.
 
 
 ```r
-library(knitr)
+for (pkg in c("knitr", "RMySQL", "dplyr", "ggplot2", "tidyr", "data.table")) {
+    if (! suppressWarnings(require(pkg, character.only=TRUE)) ) {
+        install.packages(pkg, repos="http://cran.fhcrc.org", dependencies=TRUE)
+        if (! suppressWarnings(require(pkg, character.only=TRUE)) ) {
+            stop(paste0(c("Can't load package: ", pkg, "!"), collapse = ""))
+        }
+    }
+}
+```
+
+Set `knitr` rendering options and the default number of digits for printing.
+
+
+```r
 opts_chunk$set(tidy=FALSE, cache=TRUE)
 options(digits=4)
 ```
@@ -69,8 +81,7 @@ Even better would be to configure your system to prompt you for the password.
 
 ## Table Size
 
-You can find the number of rows and columns, as well as table and index size,
-with a few simple queries.
+Print the number of rows and columns, as well as table and index size.
 
 
 ```r
@@ -100,14 +111,13 @@ cat(sum(rs[1, c("Data_length", "Index_length")]) / (1024^3), "GB")
 ```
 
 ```
-## 4.214142 GB
+## 4.283 GB
 ```
 
 ## Count Respondents by Year
 
-Usually, aggregating functions like `COUNT()` are used with `GROUP BY`. Let's
-count the number of respondents per year in Washington state (`53`). `ORDER BY` 
-is for sorting.
+Let's count (`COUNT`) the number of respondents per year (`GROUP BY`) in 
+Washington state (`X_STATE = 53`), sorting by year (`ORDER BY`).
 
 
 ```r
@@ -116,8 +126,7 @@ sql <- "SELECT IYEAR AS Year, COUNT(*) AS Respondents
         WHERE X_STATE = 53 
         GROUP BY IYEAR 
         ORDER BY IYEAR;"
-rs <- dbGetQuery(con, sql)
-rs
+dbGetQuery(con, sql)
 ```
 
 ```
@@ -137,8 +146,7 @@ rs
 
 ## Respondents per Education Level
 
-Since 2015 has very few respondents in our dataset, we will use as 2014 as
-the most recent year. To get a idea of our sample, we look at education level.
+Look at the number of respondents in 2014 and aggregate by education level.
 
 
 ```r
@@ -147,8 +155,7 @@ sql <- "SELECT X_EDUCAG AS Education, COUNT(*) AS Respondents
         WHERE IYEAR = 2014 AND X_STATE = 53 
         GROUP BY X_EDUCAG 
         ORDER BY X_EDUCAG;"
-rs <- dbGetQuery(con, sql)
-rs
+dbGetQuery(con, sql)
 ```
 
 ```
@@ -161,11 +168,11 @@ rs
 ```
 
 The education level (`X_EDUCAG`) is an integer from 1-4 (or 9 meaning 
-"Don't know", "Missing", etc.). What trend do we see here?
+"Don't know", "Missing", etc.). Do we see a trend? Is our sample skewed?
 
 ## Count Smokers by Education Level
 
-We can check the `USENOW3` variable to see if the survey respondent is
+Use the `USENOW3` variable to see if the survey respondent is
 a smoker or not. A value of `1` (Every day) or `2` (Some days) means 
 "is a smoker".
 
@@ -174,14 +181,11 @@ a smoker or not. A value of `1` (Every day) or `2` (Some days) means
 sql <- "SELECT X_EDUCAG AS Education, 
         COUNT(USENOW3) AS Smokers 
         FROM brfss 
-        WHERE IYEAR = 2014 
-              AND X_STATE = 53 
-              AND X_EDUCAG <= 4 
+        WHERE IYEAR = 2014 AND X_STATE = 53 AND X_EDUCAG <= 4 
               AND (USENOW3 = 1 OR USENOW3 = 2) 
         GROUP BY X_EDUCAG 
         ORDER BY X_EDUCAG;"
-rs <- dbGetQuery(con, sql)
-rs
+dbGetQuery(con, sql)
 ```
 
 ```
@@ -192,8 +196,8 @@ rs
 ## 4         4      57
 ```
 
-Since the number of respondents varies by education level, we will want to 
-calculate "prevalence" using respondent totals by education level.
+The number of respondents varies by education level, so we will 
+calculate "prevalence" as a fraction of respondents per education level.
 
 ## Count Smokers by Education Level
 
@@ -206,9 +210,7 @@ sql <- "SELECT X_EDUCAG AS Education,
         COUNT(*) AS Respondents, 
         COUNT(IF(USENOW3 = 1 OR USENOW3 = 2, 1, NULL)) AS Smokers 
         FROM brfss 
-        WHERE IYEAR = 2014 
-              AND X_STATE = 53 
-              AND X_EDUCAG <= 4 
+        WHERE IYEAR = 2014 AND X_STATE = 53 AND X_EDUCAG <= 4 
         GROUP BY X_EDUCAG 
         ORDER BY X_EDUCAG;"
 rs <- dbGetQuery(con, sql)
@@ -245,10 +247,10 @@ smokers
 ## 
 ##   Education Respondents Smokers Smoking.Prevalence
 ##       (int)       (dbl)   (dbl)              (dbl)
-## 1         1         496      16         0.03225806
-## 2         2        2153      83         0.03855086
-## 3         3        3023      74         0.02447899
-## 4         4        4353      57         0.01309442
+## 1         1         496      16            0.03226
+## 2         2        2153      83            0.03855
+## 3         3        3023      74            0.02448
+## 4         4        4353      57            0.01309
 ```
 
 ## Relabel Education Level
@@ -270,10 +272,10 @@ smokers
 ## 
 ##          Education Respondents Smokers Smoking.Prevalence
 ##             (fctr)       (dbl)   (dbl)              (dbl)
-## 1      some school         496      16         0.03225806
-## 2 high school grad        2153      83         0.03855086
-## 3     some college        3023      74         0.02447899
-## 4     college grad        4353      57         0.01309442
+## 1      some school         496      16            0.03226
+## 2 high school grad        2153      83            0.03855
+## 3     some college        3023      74            0.02448
+## 4     college grad        4353      57            0.01309
 ```
 
 ## Smoking Prevalence by Education Level
@@ -285,7 +287,7 @@ ggplot(data=smokers, aes(x=Education, y=Smoking.Prevalence, fill=Education)) +
     geom_bar(stat="identity")
 ```
 
-![](sql_examples_files/figure-html/unnamed-chunk-10-1.png)\
+![](sql_examples_files/figure-html/unnamed-chunk-11-1.png)\
 
 
 
@@ -324,7 +326,7 @@ ggplot(data=smokers, aes(x=Education, y=Smoking.Prevalence, fill=Year)) +
     geom_bar(stat="identity", position=position_dodge(), colour="black")
 ```
 
-![](sql_examples_files/figure-html/unnamed-chunk-13-1.png)\
+![](sql_examples_files/figure-html/unnamed-chunk-14-1.png)\
 
 
 
@@ -368,10 +370,10 @@ drinkers
 ## 
 ##          Education Respondents Drinkers Drinking.Prevalence
 ##             (fctr)       (dbl)    (dbl)               (dbl)
-## 1     college grad        4353     2947           0.6770044
-## 2     some college        3023     1646           0.5444922
-## 3 high school grad        2153     1058           0.4914073
-## 4      some school         496      162           0.3266129
+## 1     college grad        4353     2947              0.6770
+## 2     some college        3023     1646              0.5445
+## 3 high school grad        2153     1058              0.4914
+## 4      some school         496      162              0.3266
 ```
 
 ## Drinking Prevalence by Education Level
@@ -382,7 +384,7 @@ ggplot(data=drinkers, aes(x=Education, y=Drinking.Prevalence, fill=Education)) +
     geom_bar(stat="identity")
 ```
 
-![](sql_examples_files/figure-html/unnamed-chunk-17-1.png)\
+![](sql_examples_files/figure-html/unnamed-chunk-18-1.png)\
 
 
 
@@ -417,7 +419,7 @@ ggplot(data=drinkers, aes(x=Education, y=Drinking.Prevalence, fill=Year)) +
     geom_bar(stat="identity", position=position_dodge(), colour="black")
 ```
 
-![](sql_examples_files/figure-html/unnamed-chunk-20-1.png)\
+![](sql_examples_files/figure-html/unnamed-chunk-21-1.png)\
 
 
 
@@ -501,14 +503,14 @@ head(consumers, 8)
 ## 
 ##     Year        Education  Factor Prevalence
 ##   (fctr)           (fctr)  (fctr)      (dbl)
-## 1   2011      some school Smoking 0.03583427
-## 2   2011 high school grad Smoking 0.03637926
-## 3   2011     some college Smoking 0.02419700
-## 4   2011     college grad Smoking 0.01358504
-## 5   2012      some school Smoking 0.03271028
-## 6   2012 high school grad Smoking 0.04128702
-## 7   2012     some college Smoking 0.02502697
-## 8   2012     college grad Smoking 0.01576433
+## 1   2011      some school Smoking    0.03583
+## 2   2011 high school grad Smoking    0.03638
+## 3   2011     some college Smoking    0.02420
+## 4   2011     college grad Smoking    0.01359
+## 5   2012      some school Smoking    0.03271
+## 6   2012 high school grad Smoking    0.04129
+## 7   2012     some college Smoking    0.02503
+## 8   2012     college grad Smoking    0.01576
 ```
 
 ## Smoking and Drinking Prevalence
@@ -519,7 +521,7 @@ ggplot(data=consumers, aes(x=Year, y=Prevalence, group=Factor, color=Factor)) +
     geom_line() + facet_grid(Factor ~ Education, scales="free_y")
 ```
 
-![](sql_examples_files/figure-html/unnamed-chunk-25-1.png)\
+![](sql_examples_files/figure-html/unnamed-chunk-26-1.png)\
 
 
 
@@ -673,7 +675,7 @@ ggplot(data=consumers, aes(x=Year, y=Prevalence, group=Factor, color=Factor)) +
     geom_line() + facet_grid(Factor ~ Education, scales="free_y")
 ```
 
-![](sql_examples_files/figure-html/unnamed-chunk-32-1.png)\
+![](sql_examples_files/figure-html/unnamed-chunk-33-1.png)\
 
 
 
