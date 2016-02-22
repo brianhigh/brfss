@@ -546,6 +546,9 @@ sql <- "SELECT * FROM brfss
 # Use a data.table instead of a data.frame for improved performance
 library(data.table)
 brfsswa1114 <- as.data.table(dbGetQuery(con, sql))
+
+# You can also save this data.table as a SQL table in the MySQL database
+#dbWriteTable(con, name = "brfsswa1114", brfsswa1114, row.names=F)
 ```
 
 ## Check on Memory, Write to File
