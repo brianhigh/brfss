@@ -299,11 +299,15 @@ sql <- "SELECT IYEAR AS Year, X_EDUCAG AS Education,
         COUNT(*) AS Respondents, 
         COUNT(IF(USENOW3 = 1 OR USENOW3 = 2, 1, NULL)) AS Smokers
         FROM brfss 
-        WHERE (IYEAR >= 2011 AND IYEAR <= 2014)
+        WHERE (IYEAR = 2011 OR IYEAR = 2012 OR IYEAR = 2013 OR IYEAR = 2014)
               AND X_STATE = 53 
               AND X_EDUCAG <= 4 
         GROUP BY IYEAR, X_EDUCAG 
         ORDER BY IYEAR, X_EDUCAG DESC;"
+
+# The WHERE clause could also use: WHERE (IYEAR BETWEEN 2011 AND 2014)
+# The WHERE clause could also use: WHERE (IYEAR >= 2011 and IYEAR <= 2014)
+# But these will not take full advantage of our INDEX and will run slower.
 
 rs <- dbGetQuery(con, sql)
 rs %>% group_by(Year, Education) %>% 
@@ -392,7 +396,7 @@ sql <- "SELECT IYEAR AS Year, X_EDUCAG AS Education,
         COUNT(*) AS Respondents, 
         COUNT(IF(DRNKANY5 = 1, 1, NULL)) AS Drinkers 
         FROM brfss 
-        WHERE (IYEAR BETWEEN 2011 AND 2014)
+        WHERE (IYEAR = 2011 OR IYEAR = 2012 OR IYEAR = 2013 OR IYEAR = 2014)
               AND X_STATE = 53 
               AND X_EDUCAG <= 4 
         GROUP BY IYEAR, X_EDUCAG 
@@ -429,7 +433,7 @@ sql <- "SELECT IYEAR AS Year, X_EDUCAG AS Education,
         COUNT(IF(USENOW3 = 1 OR USENOW3 = 2, 1, NULL)) AS Smokers, 
         COUNT(IF(DRNKANY5 = 1, 1, NULL)) AS Drinkers 
         FROM brfss 
-        WHERE (IYEAR BETWEEN 2011 AND 2014)
+        WHERE (IYEAR = 2011 OR IYEAR = 2012 OR IYEAR = 2013 OR IYEAR = 2014)
               AND X_STATE = 53 
               AND X_EDUCAG <= 4 
         GROUP BY IYEAR, X_EDUCAG 
@@ -541,7 +545,8 @@ we can just use R commands for subsetting and work entirely from memory.
 ```r
 # Get a subset of the dataset for 2011-2014 and state of Washington
 sql <- "SELECT * FROM brfss 
-        WHERE (IYEAR BETWEEN 2011 AND 2014) AND X_STATE = 53;"
+        WHERE (IYEAR = 2011 OR IYEAR = 2012 OR IYEAR = 2013 OR IYEAR = 2014) 
+            AND X_STATE = 53;"
 
 # Use a data.table instead of a data.frame for improved performance
 library(data.table)
