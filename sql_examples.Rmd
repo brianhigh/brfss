@@ -35,9 +35,15 @@ for use in understanding variables and codes.
 In particular, we will focus on tobacco use and alcohol consumption in 
 the state of Washington.
 
-```{r set_options, echo=FALSE, message=FALSE}
+
+## Set Options
+
+We will now set rendering options for this document.
+
+```{r set_options, echo=TRUE, message=FALSE}
 library(knitr)
 opts_chunk$set(tidy=FALSE, cache=TRUE)
+options(digits=4)
 ```
 
 ## Connect to MySQL Database
@@ -337,8 +343,8 @@ From this dataframe, just subset as needed to produce tables and plots.
 
 ## Smoking and Drinking Prevalence
 
-```{r results='asis'}
-consumers %>% head(8) %>% kable(digits=3)
+```{r}
+consumers
 ```
 
 ## Smoking and Drinking in Long Format
@@ -376,8 +382,89 @@ Now that you know how to query the database, compare other variables, such as:
 - Health care access (`HLTHPLN1`) and household income (`INCOME2`)
 - Stress (`QLSTRES2`) and marital status (`MARITAL`)
 - Internet use (`INTERNET`) and mental health (`MENTHLTH`) 
-- Life satisfaction (`LSATISFY`) and social/emotional support (`EMTSUPRT`)
+- Life satisfaction (`LSATISFY`) and social/emotional support (`EMTSUPRT)`
 - What are *you* curious about?
+
+## Speeding up Queries
+
+If we retrieve all of the data for Washington state respondents in 2011-2014,
+we can just use R commands for subsetting and work entirely from memory.
+
+```{r message=FALSE}
+# Get a subset of the dataset for 2011-2014 and state of Washington
+sql <- "SELECT * FROM brfss 
+        WHERE (IYEAR BETWEEN 2011 AND 2014) AND X_STATE = 53;"
+
+# Use a data.table instead of a data.frame for improved performance
+library(data.table)
+brfsswa1114 <- as.data.table(dbGetQuery(con, sql))
+```
+
+## Check on Memory, Write to File
+
+```{r}
+# Report data table size and dimensions
+cat("The data table consumes", object.size(brfsswa1114) / 1024^2, "MB", 
+    "with", dim(brfsswa1114)[1], "observations and", 
+    dim(brfsswa1114)[2], "variables", "\n")
+
+# Save as a CSV and check on the size
+filename <- "brfsswa1114.csv"
+if (! file.exists(filename)) write.csv(brfsswa1114, filename, row.names=FALSE)
+cat(paste(c("Size of CSV file is", 
+            round(file.size(filename) / 1024^2, 1), "MB", "\n")))
+```
+
+## Query, Aggregate and Factor
+
+We can test our `data.table` by reproducing our SQL query with R commands.
+
+```{r message=FALSE}
+# Rename columns to match our SQL results
+setnames(brfsswa1114, "IYEAR", "Year")
+setnames(brfsswa1114, "X_EDUCAG", "Education")
+
+# Use order() to set sort order like in SQL
+brfsswa1114 <- brfsswa1114[order(Year, Education)]
+
+# Use DT[i, j, by=...] syntax to query and aggregate like in SQL
+consumers <- brfsswa1114[Education <= 4, list(
+    Smoking = sum(USENOW3 == 1 | USENOW3 == 2, na.rm = TRUE)/.N,
+    Drinking = sum(DRNKANY5 == 1, na.rm = TRUE)/.N), 
+    by = list(Year, Education)]
+
+# Use the same factor() commands as before
+consumers$Education <- factor(consumers$Education, levels=1:4, 
+                              labels=edu.labels)
+consumers$Year <- factor(consumers$Year)
+```
+
+## Check Results
+
+```{r}
+consumers
+```
+
+## Convert to Long Format
+
+```{r}
+# Use the same gather() command as before
+consumers <- consumers %>% 
+    gather(key=Factor, value=Prevalence, -Year, -Education)
+consumers %>% head(16)
+```
+
+## Smoking and Drinking Prevalence
+
+```{r}
+# User the same ggplot() command as before
+ggplot(data=consumers, aes(x=Year, y=Prevalence, group=Factor, color=Factor)) + 
+    geom_line() + facet_grid(Factor ~ Education, scales="free_y")
+```
+
+```{r echo=F, results='hide'}
+dev.off()
+```
 
 ## Close Database Connection
 

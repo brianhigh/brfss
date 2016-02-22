@@ -28,6 +28,16 @@ In particular, we will focus on tobacco use and alcohol consumption in
 the state of Washington.
 
 
+## Set Options
+
+We will now set rendering options for this document.
+
+
+```r
+library(knitr)
+opts_chunk$set(tidy=FALSE, cache=TRUE)
+options(digits=4)
+```
 
 ## Connect to MySQL Database
 
@@ -440,21 +450,32 @@ From this dataframe, just subset as needed to produce tables and plots.
 
 
 ```r
-consumers %>% head(8) %>% kable(digits=3)
+consumers
 ```
 
-
-
-Year   Education           Respondents   Smokers   Drinkers   Smoking   Drinking
------  -----------------  ------------  --------  ---------  --------  ---------
-2011   some school                 893        32        309     0.036      0.346
-2011   high school grad           3491       127       1654     0.036      0.474
-2011   some college               4670       113       2553     0.024      0.547
-2011   college grad               5668        77       3817     0.014      0.673
-2012   some school                 856        28        291     0.033      0.340
-2012   high school grad           3512       145       1700     0.041      0.484
-2012   some college               4635       116       2650     0.025      0.572
-2012   college grad               6280        99       4330     0.016      0.689
+```
+## Source: local data frame [16 x 7]
+## Groups: Year, Education [16]
+## 
+##      Year        Education Respondents Smokers Drinkers Smoking Drinking
+##    (fctr)           (fctr)       (dbl)   (dbl)    (dbl)   (dbl)    (dbl)
+## 1    2011      some school         893      32      309 0.03583   0.3460
+## 2    2011 high school grad        3491     127     1654 0.03638   0.4738
+## 3    2011     some college        4670     113     2553 0.02420   0.5467
+## 4    2011     college grad        5668      77     3817 0.01359   0.6734
+## 5    2012      some school         856      28      291 0.03271   0.3400
+## 6    2012 high school grad        3512     145     1700 0.04129   0.4841
+## 7    2012     some college        4635     116     2650 0.02503   0.5717
+## 8    2012     college grad        6280      99     4330 0.01576   0.6895
+## 9    2013      some school         581      22      196 0.03787   0.3373
+## 10   2013 high school grad        2578     114     1242 0.04422   0.4818
+## 11   2013     some college        3426      85     1885 0.02481   0.5502
+## 12   2013     college grad        4546      62     3090 0.01364   0.6797
+## 13   2014      some school         496      16      162 0.03226   0.3266
+## 14   2014 high school grad        2153      83     1058 0.03855   0.4914
+## 15   2014     some college        3023      74     1646 0.02448   0.5445
+## 16   2014     college grad        4353      57     2947 0.01309   0.6770
+```
 
 ## Smoking and Drinking in Long Format
 
@@ -508,8 +529,145 @@ Now that you know how to query the database, compare other variables, such as:
 - Health care access (`HLTHPLN1`) and household income (`INCOME2`)
 - Stress (`QLSTRES2`) and marital status (`MARITAL`)
 - Internet use (`INTERNET`) and mental health (`MENTHLTH`) 
-- Life satisfaction (`LSATISFY`) and social/emotional support (`EMTSUPRT`)
+- Life satisfaction (`LSATISFY`) and social/emotional support (`EMTSUPRT)`
 - What are *you* curious about?
+
+## Speeding up Queries
+
+If we retrieve all of the data for Washington state respondents in 2011-2014,
+we can just use R commands for subsetting and work entirely from memory.
+
+
+```r
+# Get a subset of the dataset for 2011-2014 and state of Washington
+sql <- "SELECT * FROM brfss 
+        WHERE (IYEAR BETWEEN 2011 AND 2014) AND X_STATE = 53;"
+
+# Use a data.table instead of a data.frame for improved performance
+library(data.table)
+brfsswa1114 <- as.data.table(dbGetQuery(con, sql))
+```
+
+## Check on Memory, Write to File
+
+
+```r
+# Report data table size and dimensions
+cat("The data table consumes", object.size(brfsswa1114) / 1024^2, "MB", 
+    "with", dim(brfsswa1114)[1], "observations and", 
+    dim(brfsswa1114)[2], "variables", "\n")
+```
+
+```
+## The data table consumes 197 MB with 51335 observations and 999 variables
+```
+
+```r
+# Save as a CSV and check on the size
+filename <- "brfsswa1114.csv"
+if (! file.exists(filename)) write.csv(brfsswa1114, filename, row.names=FALSE)
+cat(paste(c("Size of CSV file is", 
+            round(file.size(filename) / 1024^2, 1), "MB", "\n")))
+```
+
+```
+## Size of CSV file is 142.9 MB
+```
+
+## Query, Aggregate and Factor
+
+We can test our `data.table` by reproducing our SQL query with R commands.
+
+
+```r
+# Rename columns to match our SQL results
+setnames(brfsswa1114, "IYEAR", "Year")
+setnames(brfsswa1114, "X_EDUCAG", "Education")
+
+# Use order() to set sort order like in SQL
+brfsswa1114 <- brfsswa1114[order(Year, Education)]
+
+# Use DT[i, j, by=...] syntax to query and aggregate like in SQL
+consumers <- brfsswa1114[Education <= 4, list(
+    Smoking = sum(USENOW3 == 1 | USENOW3 == 2, na.rm = TRUE)/.N,
+    Drinking = sum(DRNKANY5 == 1, na.rm = TRUE)/.N), 
+    by = list(Year, Education)]
+
+# Use the same factor() commands as before
+consumers$Education <- factor(consumers$Education, levels=1:4, 
+                              labels=edu.labels)
+consumers$Year <- factor(consumers$Year)
+```
+
+## Check Results
+
+
+```r
+consumers
+```
+
+```
+##     Year        Education Smoking Drinking
+##  1: 2011      some school 0.03583   0.3460
+##  2: 2011 high school grad 0.03638   0.4738
+##  3: 2011     some college 0.02420   0.5467
+##  4: 2011     college grad 0.01359   0.6734
+##  5: 2012      some school 0.03271   0.3400
+##  6: 2012 high school grad 0.04129   0.4841
+##  7: 2012     some college 0.02503   0.5717
+##  8: 2012     college grad 0.01576   0.6895
+##  9: 2013      some school 0.03787   0.3373
+## 10: 2013 high school grad 0.04422   0.4818
+## 11: 2013     some college 0.02481   0.5502
+## 12: 2013     college grad 0.01364   0.6797
+## 13: 2014      some school 0.03226   0.3266
+## 14: 2014 high school grad 0.03855   0.4914
+## 15: 2014     some college 0.02448   0.5445
+## 16: 2014     college grad 0.01309   0.6770
+```
+
+## Convert to Long Format
+
+
+```r
+# Use the same gather() command as before
+consumers <- consumers %>% 
+    gather(key=Factor, value=Prevalence, -Year, -Education)
+consumers %>% head(16)
+```
+
+```
+##    Year        Education  Factor Prevalence
+## 1  2011      some school Smoking    0.03583
+## 2  2011 high school grad Smoking    0.03638
+## 3  2011     some college Smoking    0.02420
+## 4  2011     college grad Smoking    0.01359
+## 5  2012      some school Smoking    0.03271
+## 6  2012 high school grad Smoking    0.04129
+## 7  2012     some college Smoking    0.02503
+## 8  2012     college grad Smoking    0.01576
+## 9  2013      some school Smoking    0.03787
+## 10 2013 high school grad Smoking    0.04422
+## 11 2013     some college Smoking    0.02481
+## 12 2013     college grad Smoking    0.01364
+## 13 2014      some school Smoking    0.03226
+## 14 2014 high school grad Smoking    0.03855
+## 15 2014     some college Smoking    0.02448
+## 16 2014     college grad Smoking    0.01309
+```
+
+## Smoking and Drinking Prevalence
+
+
+```r
+# User the same ggplot() command as before
+ggplot(data=consumers, aes(x=Year, y=Prevalence, group=Factor, color=Factor)) + 
+    geom_line() + facet_grid(Factor ~ Education, scales="free_y")
+```
+
+![](sql_examples_files/figure-html/unnamed-chunk-32-1.png)\
+
+
 
 ## Close Database Connection
 
