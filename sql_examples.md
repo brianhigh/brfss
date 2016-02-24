@@ -556,6 +556,10 @@ brfsswa1114 <- as.data.table(dbGetQuery(con, sql))
 
 # You can also save this data.table as a SQL table in the MySQL database
 #dbWriteTable(con, name = "brfsswa1114", brfsswa1114, row.names=F)
+
+# Remove columns that contain only NA , zero (0), or the empty string ('')
+brfsswa1114 <- brfsswa1114[, which(unlist(lapply(
+    brfsswa1114, function(x) ! all(is.na(x) | x==0 | x=='')))), with=F]
 ```
 
 ## Check on Memory, Write to File
@@ -569,7 +573,7 @@ cat("The data table consumes", object.size(brfsswa1114) / 1024^2, "MB",
 ```
 
 ```
-## The data table consumes 197 MB with 51335 observations and 999 variables
+## The data table consumes 82.59 MB with 51335 observations and 417 variables
 ```
 
 ```r
@@ -581,7 +585,7 @@ cat(paste(c("Size of CSV file is",
 ```
 
 ```
-## Size of CSV file is 142.9 MB
+## Size of CSV file is 57.5 MB
 ```
 
 ## Query, Aggregate and Factor
@@ -604,6 +608,8 @@ consumers <- brfsswa1114[Education <= 4, list(
     by = list(Year, Education)]
 
 # Use the same factor() commands as before
+edu.labels <- c("some school", "high school grad", 
+                "some college", "college grad")
 consumers$Education <- factor(consumers$Education, levels=1:4, 
                               labels=edu.labels)
 consumers$Year <- factor(consumers$Year)
