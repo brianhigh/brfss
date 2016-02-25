@@ -148,6 +148,11 @@ state_choropleth(map.values, num_colors = 5)
 
 ![](sleep_duration_files/figure-html/unnamed-chunk-7-1.png)\
 
+
+
+
+## Age-adjustment
+
 The shading and bins are not exactly the same as the figure in the journal
 article, but they are very similar. 
 

@@ -142,6 +142,13 @@ merge(states, sleep.state) %>% select(region, value) %>%
 state_choropleth(map.values, num_colors = 5)
 ```
 
+```{r echo=F, results='hide'}
+dev.off()
+```
+
+
+## Age-adjustment
+
 The shading and bins are not exactly the same as the figure in the journal
 article, but they are very similar. 
 
