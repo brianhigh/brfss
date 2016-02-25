@@ -40,7 +40,7 @@ Set `knitr` rendering options and the default number of digits for printing.
 
 
 ```r
-opts_chunk$set(tidy=FALSE, cache=TRUE)
+opts_chunk$set(tidy=FALSE, cache=FALSE)
 options(digits=4)
 ```
 
@@ -88,19 +88,26 @@ sql <- "SELECT X_STATE AS StateNum, X_AGE80 AS Age,
         ORDER BY X_STATE, X_AGE80;"
 
 rs <- dbGetQuery(con, sql)
+dbDisconnect(con)
+```
+
+```
+## [1] TRUE
 ```
 
 ## Calculate prevalence
 
-Calculate prevalence by age for each state, then calculate the mean of those 
-means by state. This will become the value of the shading in the choropleth.
+Calculate percent prevalence by age for each state, then calculate the mean of
+those prevalences by state. This is a crude form of "age-adjustment". These 
+means will become the value of the shading in the choropleth.
 
 
 ```r
 rs %>% group_by(Age) %>% 
-    mutate(Prevalence=HealthySleepers/Respondents) -> sleepers
+    mutate(Prevalence = 100 * (HealthySleepers/Respondents)) -> sleepers
 sleepers %>% select(StateNum, Age, Prevalence) %>% 
-    group_by(StateNum) %>% summarize(value=mean(Prevalence)) -> sleep.state
+    group_by(StateNum) %>% 
+    summarize(value=mean(Prevalence)) -> sleep.state
 ```
 
 ## Get state data
@@ -140,5 +147,12 @@ state_choropleth(map.values, num_colors = 5)
 ![](sleep_duration_files/figure-html/unnamed-chunk-7-1.png)\
 
 The shading and bins are not exactly the same as the figure in the journal
-article, but they are very similar. We probably did not "age-adjust" in the 
-same way.
+article, but they are very similar. 
+
+We did *not* "age-adjust" in the same way that the authors described:
+
+> The age-adjusted prevalence and 95% confidence interval (CI) of the recommended healthy sleep duration (≥7 hours) was calculated by state and selected characteristics, and adjusted to the 2000 projected U.S. population aged ≥18 years.
+
+We mearly took the mean of the prevelance of each age level by state, 
+without taking into account any other "selected characteristics" or 
+the "2000 projected U.S. population".
