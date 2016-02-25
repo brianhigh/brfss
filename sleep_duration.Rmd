@@ -14,11 +14,17 @@ output:
 
 The paper:
 
-Liu Y, Wheaton AG, Chapman DP, Cunningham TJ, Lu H, Croft JB. Prevalence of Healthy Sleep Duration among Adults — United States, 2014. MMWR Morb Mortal Wkly Rep 2016;65:137–141. DOI: http://dx.doi.org/10.15585/mmwr.mm6506a1.
+Liu Y, Wheaton AG, Chapman DP, Cunningham TJ, Lu H, Croft JB. Prevalence of 
+Healthy Sleep Duration among Adults — United States, 2014. MMWR Morb Mortal 
+Wkly Rep 2016;65:137–141. DOI: http://dx.doi.org/10.15585/mmwr.mm6506a1.
 
 Reports:
 
-> The first state-specific estimates of the prevalence of a ≥7 hour sleep duration in a 24-hour period show geographic clustering of lower prevalence estimates for this duration of sleep in the southeastern United States and in states along the Appalachian Mountains, which are regions with the highest burdens of obesity and other chronic conditions. 
+> The first state-specific estimates of the prevalence of a ≥7 hour sleep 
+> duration in a 24-hour period show geographic clustering of lower prevalence 
+> estimates for this duration of sleep in the southeastern United States and 
+> in states along the Appalachian Mountains, which are regions with the highest 
+> burdens of obesity and other chronic conditions. 
 
 ## Reproduce the choropleth
 
@@ -26,14 +32,18 @@ Let's try and reproduce the choropleth from the paper:
 
 ![](http://www.cdc.gov/mmwr/volumes/65/wr/figures/m6506a1f.gif)
 
-FIGURE. Age-adjusted percentage of adults who reported ≥7 hours of sleep per 24-hour period, by state — Behavioral Risk Factor Surveillance System, United States, 2014
+FIGURE. Age-adjusted percentage of adults who reported ≥7 hours of sleep per 
+24-hour period, by state — Behavioral Risk Factor Surveillance System, 
+United States, 2014
 
 ## Install Packages and Set Options
 
 Load the required R packages, installing as necessary.
 
 ```{r, echo=TRUE, message=FALSE}
-for (pkg in c("knitr", "RMySQL", "dplyr", "choroplethrMaps", "choroplethr")) {
+pkgs <- c("knitr", "RMySQL", "dplyr", "epitools", 
+          "choroplethrMaps", "choroplethr")
+for (pkg in pkgs) {
     if (! suppressWarnings(require(pkg, character.only=TRUE)) ) {
         install.packages(pkg, repos="http://cran.fhcrc.org", dependencies=TRUE)
         if (! suppressWarnings(require(pkg, character.only=TRUE)) ) {
@@ -159,11 +169,15 @@ article, but they are very similar.
 
 We did *not* "age-adjust" in the same way that the authors described:
 
-> The age-adjusted prevalence and 95% confidence interval (CI) of the recommended healthy sleep duration (≥7 hours) was calculated by state and selected characteristics, and adjusted to the 2000 projected U.S. population aged ≥18 years.
+> The age-adjusted prevalence and 95% confidence interval (CI) of the 
+> recommended healthy sleep duration (≥7 hours) was calculated by state 
+> and selected characteristics, and adjusted to the 2000 projected U.S. 
+> population aged ≥18 years.
 
 We merely took the mean of the prevelance of each age level by state, 
 without taking into account any other "selected characteristics" or 
 the "2000 projected U.S. population".
 
-- Todo: [age-adjust](http://www.inside-r.org/packages/cran/epitools/docs/ageadjust.direct) using the [epitools](https://cran.r-project.org/web/packages/epitools/index.html) package
+- Todo: [age-adjust](http://www.inside-r.org/packages/cran/epitools/docs/ageadjust.direct) 
+  using the [epitools](https://cran.r-project.org/web/packages/epitools/index.html) package
 - Todo: [remove the state abbreviations](http://www.r-bloggers.com/how-to-remove-state-abbreviations-from-a-choroplethr-map/) from the choropleth map
