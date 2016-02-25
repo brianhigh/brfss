@@ -121,6 +121,7 @@ the choropleth.
 ```r
 rs %>% group_by(Age) %>% 
     mutate(Prevalence = 100 * (HealthySleepers/Respondents)) -> sleepers
+     
 sleepers %>% select(StateNum, Age, Prevalence) %>% 
     group_by(StateNum) %>% 
     summarize(value=mean(Prevalence)) -> sleep.state
@@ -186,6 +187,85 @@ We merely took the mean of the prevelance of each age level by state,
 without taking into account any other "selected characteristics" or 
 the "2000 projected U.S. population".
 
-- Todo: [age-adjust](http://www.inside-r.org/packages/cran/epitools/docs/ageadjust.direct) 
-  using the [epitools](https://cran.r-project.org/web/packages/epitools/index.html) package
-- Todo: [remove the state abbreviations](http://www.r-bloggers.com/how-to-remove-state-abbreviations-from-a-choroplethr-map/) from the choropleth map
+Next, we will try age-adjustment.
+
+## Get standard population by single age
+
+Now, we will apply age-adjustment to the crude prevalence values. To do that,
+we will need standard population totals from the US census. We will get these
+via the NIH, which kindly posted them as a table on a web page.
+
+Load the CSV data file if you have it, otherwise create the CSV by scraping the 
+signle age standard populations table from the NIH website.
+
+
+```r
+agesfile <- "ages.csv"
+if (file.exists(agesfile)) {
+    # Read data from CSV
+    ages <- read.csv(file = agesfile, header = TRUE)
+} else {
+    # Scrape table from NIH web page and save as CSV for later
+    library(XML)
+    ages.url <- "http://seer.cancer.gov/stdpopulations/stdpop.singleages.html"
+    ages.tbl <- readHTMLTable(ages.url)
+    ages <- ages.tbl[[1]][2:102, c(1,2)]
+    row.names(ages) <- NULL
+    names(ages) <- c("Age", "StdPop")
+    ages$Age <- factor(as.numeric(
+        sapply(ages$Age, function (x) gsub("[+]? years$", "", x))))
+    ages$StdPop <- as.numeric(
+        sapply(ages$StdPop, function (x) gsub(",", "", x)))
+    write.csv(ages, file=agesfile, row.names=FALSE)
+}
+```
+
+## Age-adjustment with `ageadjust.direct()`
+
+We create a wrapper function around the `ageadjust.direct()` function from
+the epitools package. Then we apply per state using `sapply()`.
+
+
+```r
+sleepers.pop <- merge(sleepers, ages)
+
+adjustAge <- function(state.num, data) {
+    adj <- as.vector(with(data[data$StateNum==state.num,],
+                        ageadjust.direct(count = HealthySleepers,
+                                         pop = Respondents, 
+                                         stdpop = StdPop, 
+                                         conf.level = 0.95)))
+    adj['StateNum'] <- state.num
+    names(adj) <- c("crude.rate", "adj.rate", "lci", "uci", "StateNum")
+    return(adj)
+}
+
+sleepers.adj <- sapply(unique(sleepers.pop$StateNum),
+                       function(x) adjustAge(x, sleepers.pop)) %>% 
+                                   t %>% as.data.frame
+
+sleepers.adj %>% mutate(value=adj.rate*100) %>% 
+    select(StateNum, value) -> sleep.state.adj
+```
+
+## Age-adjusted choropleth map
+
+We still see differences in the bins and the colors, so we suspect that the
+authors of the paper used a different method for age-adjustment. Perhaps
+instead of using single age standard population numbers, they may have used
+numbers for age ranges.
+
+
+```r
+merge(states, sleep.state.adj) %>% select(region, value) -> map.values
+state_choropleth(map.values, num_colors = 5)
+```
+
+![](sleep_duration_files/figure-html/unnamed-chunk-11-1.png)\
+
+
+
+## What's next?
+
+- Find out why our age-adjustments don't match those in the original paper.
+- [remove the state abbreviations](http://www.r-bloggers.com/how-to-remove-state-abbreviations-from-a-choroplethr-map/) from the choropleth map
