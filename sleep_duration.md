@@ -115,7 +115,9 @@ sleepers %>% select(StateNum, Age, Prevalence) %>%
 Get the list of states and their numbers from the 
 [codebook](http://www.cdc.gov/brfss/annual_data/2014/pdf/codebook14_llcp.pdf).
 
-We will do this in Bash. Todo: Do this in R, instead, for portability.
+We will do this in Bash. 
+
+- Todo: Do this in R, instead of bash, for portability.
 
 
 ```bash
@@ -156,3 +158,6 @@ We did *not* "age-adjust" in the same way that the authors described:
 We merely took the mean of the prevelance of each age level by state, 
 without taking into account any other "selected characteristics" or 
 the "2000 projected U.S. population".
+
+- Todo: [age-adjust](http://www.inside-r.org/packages/cran/epitools/docs/ageadjust.direct) using the [epitools](https://cran.r-project.org/web/packages/epitools/index.html) package
+- Todo: [remove the state abbreviations](http://www.r-bloggers.com/how-to-remove-state-abbreviations-from-a-choroplethr-map/) from the choropleth map
