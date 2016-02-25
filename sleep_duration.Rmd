@@ -79,7 +79,8 @@ Even better would be to configure your system to prompt you for the password.
 ## Fetch the data
 
 We need the state (`X_STATE`), age (`X_AGE80`) and sleep (`SLEPTIM1`) variables 
-for 2014.
+for adults (`X_AGE80 >= 18`) in 2014, except those from Guam (`X_STATE = 66`)
+or Puerto Rico (`X_STATE = 72`).
 
 ```{r}
 sql <- "SELECT X_STATE AS StateNum, X_AGE80 AS Age, 
@@ -87,6 +88,8 @@ sql <- "SELECT X_STATE AS StateNum, X_AGE80 AS Age,
         COUNT(IF(SLEPTIM1 BETWEEN 7 AND 24, 1, NULL)) AS HealthySleepers 
         FROM brfss 
         WHERE IYEAR = 2014 
+            AND NOT (X_STATE = 66 OR X_STATE = 72) 
+            AND X_AGE80 >= 18
         GROUP BY X_STATE, X_AGE80 
         ORDER BY X_STATE, X_AGE80;"
 
@@ -140,8 +143,7 @@ these values. Use five bins to match the original figure.
 states <- read.csv("states_list.csv", header=F)
 names(states) <- c("StateNum", "State")
 states <- mutate(states, region=tolower(State))
-merge(states, sleep.state) %>% select(region, value) %>% 
-    filter(! region %in% c("guam", "puerto rico")) -> map.values
+merge(states, sleep.state) %>% select(region, value) -> map.values
 state_choropleth(map.values, num_colors = 5)
 ```
 
