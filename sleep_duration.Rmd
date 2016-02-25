@@ -105,6 +105,10 @@ sql <- "SELECT X_STATE AS StateNum, X_AGE80 AS Age,
 
 rs <- dbGetQuery(con, sql)
 dbDisconnect(con)
+
+# Save a copy of the dataset as a backup
+filename <- "sleep_data_2014.csv"
+if (! file.exists(filename)) write.csv(rs, filename, row.names=F)
 ```
 
 ## Calculate prevalence

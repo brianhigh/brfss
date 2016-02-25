@@ -108,6 +108,12 @@ dbDisconnect(con)
 ## [1] TRUE
 ```
 
+```r
+# Save a copy of the dataset as a backup
+filename <- "sleep_data_2014.csv"
+if (! file.exists(filename)) write.csv(rs, filename, row.names=F)
+```
+
 ## Calculate prevalence
 
 For now, we are just using age-specific, crude prevalence (not 
