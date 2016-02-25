@@ -147,7 +147,11 @@ cat states.txt | awk '{ print $1, ",", $2, $3, $4 }' | \
 
 Read in the state names and their number codes from the previous step. Merge 
 with the prevalence values by state number. Make the choropleth map with 
-these values. Use five bins to match the original figure.
+these values using the [choroplethr](https://github.com/arilamstein/choroplethr) 
+package. Use five bins to match the original figure. This will reverse the order
+of the levels as shown in the legend, as compared with the original map. Our
+map will not show the floating square for Washington, DC, as seen in the
+original map.
 
 ```{r}
 states <- read.csv("states_list.csv", header=F)
