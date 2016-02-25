@@ -153,6 +153,6 @@ We did *not* "age-adjust" in the same way that the authors described:
 
 > The age-adjusted prevalence and 95% confidence interval (CI) of the recommended healthy sleep duration (≥7 hours) was calculated by state and selected characteristics, and adjusted to the 2000 projected U.S. population aged ≥18 years.
 
-We mearly took the mean of the prevelance of each age level by state, 
+We merely took the mean of the prevelance of each age level by state, 
 without taking into account any other "selected characteristics" or 
 the "2000 projected U.S. population".
