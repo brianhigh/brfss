@@ -96,9 +96,12 @@ dbDisconnect(con)
 
 ## Calculate prevalence
 
+For now, we are just using age-specific, crude prevalence (not 
+[age-adjusted](http://seer.cancer.gov/seerstat/tutorials/aarates/definition.html)).
+
 Calculate percent prevalence by age for each state, then calculate the mean of
-those prevalences by state. This is a crude form of "age-adjustment". These 
-means will become the value of the shading in the choropleth.
+those prevalences by state. These means will become the value of the shading in 
+the choropleth.
 
 ```{r}
 rs %>% group_by(Age) %>% 
