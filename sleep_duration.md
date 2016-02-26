@@ -286,13 +286,13 @@ ranges:
 > Risk Factor Surveillance System, United States, 2014
 
 ```
-Characteristic          No.†    % (95% CI)§
+Characteristic      No.†    %       (95% CI)§
 Age group (yrs)
-18–24            23,234	67.8    (66.8–68.7)
-25–34            42,084	62.1    (61.3–62.9)
-35–44            52,385	61.7    (60.9–62.5)
-45–64           173,357	62.7    (62.2–63.1)
-≥65             153,246	73.7    (73.2–74.2)
+18–24            23,234     67.8    (66.8–68.7)
+25–34            42,084     62.1    (61.3–62.9)
+35–44            52,385     61.7    (60.9–62.5)
+45–64           173,357     62.7    (62.2–63.1)
+≥65             153,246     73.7    (73.2–74.2)
 
 Abbreviations: CI = confidence interval; NA = not applicable
 * Age-adjusted to the 2000 projected U.S. population aged ≥18 years, 
