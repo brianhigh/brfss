@@ -286,13 +286,13 @@ ranges:
 > Risk Factor Surveillance System, United States, 2014
 
 ```
-Characteristic      No.†	     % (95% CI)§
+Characteristic          No.†    % (95% CI)§
 Age group (yrs)
-18–24             23,234	67.8 (66.8–68.7)
-25–34	          42,084	62.1 (61.3–62.9)
-35–44	          52,385	61.7 (60.9–62.5)
-45–64	         173,357	62.7 (62.2–63.1)
-≥65	             153,246	73.7 (73.2–74.2)
+18–24           23,234	67.8    (66.8–68.7)
+25–34           42,084	62.1    (61.3–62.9)
+35–44           52,385	61.7    (60.9–62.5)
+45–64           173,357	62.7    (62.2–63.1)
+≥65             153,246	73.7    (73.2–74.2)
 
 Abbreviations: CI = confidence interval; NA = not applicable
 * Age-adjusted to the 2000 projected U.S. population aged ≥18 years, 
@@ -333,9 +333,10 @@ We will do this in Bash.
 curl -o statnt20.pdf 'http://www.cdc.gov/nchs/data/statnt/statnt20.pdf'
 pdftk statnt20.pdf cat 3 output statnt20_2.pdf
 pdftotext -nopgbrk -layout statnt20_2.pdf ages.txt
-grep -A6 "Distribution #9" ages.txt | sed -r -n 's/^(.{93}).*/\1/gp' | \
+iconv -c -f utf-8 -t ascii ages.txt > ages_ascii.txt
+grep -A6 "Distribution #9" ages_ascii.txt | sed -r -n 's/^(.{93}).*/\1/gp' | \
     awk '{ print $1, $(NF-1), $NF }' | \
-    sed -r -n -e 's/\u2013[0-9]{2}//g' -e 's/,//g' -e 's/ /,/gp' | \
+    sed -r -n -e 's/^([0-9]{2})[0-9]*/\1/g' -e 's/,//g' -e 's/ /,/gp' | \
     tail -5  > ages5.csv
 ```
 
