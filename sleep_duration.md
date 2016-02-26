@@ -161,7 +161,8 @@ these values using the [choroplethr](https://github.com/arilamstein/choroplethr)
 package. Use five bins to match the original figure. This will reverse the order
 of the levels as shown in the legend, as compared with the original map. Our
 map will not show the floating square for Washington, DC, as seen in the
-original map.
+original map. The choroplethr function `state_choropleth()` does not plot
+Washington, DC because it is not a state.
 
 
 ```r
@@ -271,11 +272,6 @@ state_choropleth(map.values, num_colors = 5)
 
 
 
-## What's next?
-
-- Find out why our age-adjustments don't match those in the original paper.
-- [remove the state abbreviations](http://www.r-bloggers.com/how-to-remove-state-abbreviations-from-a-choroplethr-map/) from the choropleth map
-
 ## Age-adjustment with age ranges
 
 Looking through the paper, we see this table, with a short list of five age 
@@ -381,3 +377,8 @@ state_choropleth(map.values, num_colors = 5)
 
 
 
+## What's next?
+
+- Find out why our age-adjustments don't match those in the original paper.
+- [remove the state abbreviations](http://www.r-bloggers.com/how-to-remove-state-abbreviations-from-a-choroplethr-map/) from the choropleth map
+- Consider using a different choropleth method in order to show Washington, DC.
