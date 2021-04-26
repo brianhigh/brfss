@@ -1,7 +1,7 @@
 ---
 title: "Get BRFSS Data"
 author: "Brian High"
-date: "02/17/2016"
+date: "04/26/2021"
 output:
   html_document:
     keep_md: yes
@@ -9,14 +9,14 @@ output:
 
 ## Overview
 
-Get the 2012-2014 datasets from http://www.cdc.gov/brfss, load into a data 
+Get the 2012-2018 datasets from http://www.cdc.gov/brfss, load into a data 
 table, report file sizes and memory use, and save the data to a single TSV 
 file.
 
 ## Configure the time range in years
 
 ```{r}
-datayears <- as.character(seq(2012, 2014))
+datayears <- as.character(seq(2012, 2018))
 ```
 
 ## Load packages
@@ -167,6 +167,8 @@ retval <- reportSize(brfss, "all years")
 tsvfile <- paste(datadir, "brfss_data.tsv", sep="/")
 write.table(x=brfss, file=tsvfile, row.names=FALSE, fileEncoding="UTF-8", 
             sep="\t", quote=FALSE, na="\\N", eol="\n")
+
+# Note: To save as an Rdata file: saveRDS(brfss, "data/brfss_data.rds")
 
 # Report file size of TSV file
 retval <- reportFileSize(tsvfile)
