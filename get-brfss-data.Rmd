@@ -1,7 +1,7 @@
 ---
 title: "Get BRFSS Data"
 author: "Brian High"
-date: "04/27/2021"
+date: "04/04/2023"
 output:
   html_document:
     keep_md: yes
@@ -9,41 +9,30 @@ output:
 
 ## Overview
 
-Get the 2012-2019 datasets from http://www.cdc.gov/brfss, load into a data 
+Get the 2012-2021 datasets from http://www.cdc.gov/brfss, load into a data 
 table, report file sizes and memory use, and save the data to a single TSV 
 file and a single RDS file.
 
 ## Configure the time range in years
 
 ```{r}
-datayears <- as.character(seq(2012, 2019))
+datayears <- as.character(seq(2012, 2021))
 ```
 
 ## Load packages
 
 ```{r, message=FALSE}
-## Install packages (if necessary)
-for (pkg in c("foreign", "data.table", "plyr")) {
-    if (! suppressWarnings(require(pkg, character.only=TRUE)) ) {
-        install.packages(pkg, repos="http://cran.fhcrc.org", dependencies=TRUE)
-        if (! suppressWarnings(require(pkg, character.only=TRUE)) ) {
-            stop(paste(c("Can't load package: ", pkg, "!"), sep = ""))
-        }
-    }
-}
+# Attach packages, installing as needed
+if(!requireNamespace("pacman", quietly = TRUE)) install.packages("pacman")
+pacman::p_load(foreign, data.table, plyr)
 ```
 
 ## Set up data folder
 
 ```{r}
 # Create the data folder if it does not already exist
-datadir <- "./data"
-dir.create(file.path(datadir), showWarnings=FALSE, recursive=TRUE)
-
-# Enter data folder, first saving location of current folder
-projdir <- getwd()
-setwd(datadir)
-datadir <- getwd()
+datadir <- file.path("data")
+if (!dir.exists(datadir)) dir.create(path = datadir, recursive = TRUE)
 ```
 
 ## Download data files
@@ -71,21 +60,17 @@ reportFileSize <- function(filename) {
 }
 
 downloadDataFile <- function(datadir, datayear) {
-    setwd(datadir)
     dataurl <- getDataURL(datayear)
-    datafile <- paste("LLCP", datayear, "XPT.ZIP", sep="")
+    datafile <- file.path(datadir, paste("LLCP", datayear, "XPT.ZIP", sep=""))
     
     if (! file.exists(datafile)) {
         cat("Downloading data file for year", datayear, "...\n")
-        download.file(dataurl, datafile, mode='wb')
+        download.file(dataurl, datafile, mode = 'wb')
         cat("Completed at", format(Sys.time()), "\n")
     }
     
     # Report file size of downloaded file
     retval <- reportFileSize(datafile)
-    
-    # Return to project folder
-    setwd(projdir)
 }
 
 retval <- sapply(datayears, function(x) downloadDataFile(datadir, x))
@@ -106,13 +91,12 @@ getSASFileName <- function(datayear) {
 }
 
 extractDataFile <- function (datadir, datayear) {
-    setwd(datadir)
-    sasfile <- getSASFileName(datayear)
-    datafile <- paste("LLCP", datayear, "XPT.ZIP", sep="")
+    sasfile <- file.path(datadir, getSASFileName(datayear))
+    datafile <- file.path(datadir, paste("LLCP", datayear, "XPT.ZIP", sep=""))
     
     if (! file.exists(sasfile)) {
         cat("Extracting SAS data file ", sasfile, "...", "\n")
-        unzip(datafile)
+        unzip(datafile, exdir = datadir)
         # Remove the space character at the end of filename if necessary.
         # This found to be an issue in the 2014 data file.
         if (file.exists(paste(sasfile, " ", sep=""))) {
@@ -122,9 +106,6 @@ extractDataFile <- function (datadir, datayear) {
     
     # Report file size of extracted file
     retval <- reportFileSize(sasfile)
-    
-    # Return to project folder
-    setwd(projdir)
 }
 
 retval <- sapply(datayears, function(x) extractDataFile(datadir, x))
@@ -145,19 +126,15 @@ reportSize <- function(dt, datayear) {
 
 importDataFile <- function(datadir, datayear) {
     # Read data file
-    setwd(datadir)
-    options(digits=2)
-    sasfile <- getSASFileName(datayear)
+    options(digits = 2)
+    sasfile <- file.path(datadir, getSASFileName(datayear))
     dt <- as.data.table(read.xport(sasfile))
     retval <- reportSize(dt, datayear)
-    
-    # Return to project folder
-    setwd(projdir)
     return(dt)
 }
 
-brfss <- as.data.table(adply(.data=datayears, .margins=c(1),
-                       .fun=function(x) importDataFile(datadir, x)))
+brfss <- as.data.table(adply(.data = datayears, .margins = c(1),
+                       .fun = function(x) importDataFile(datadir, x)))
 retval <- reportSize(brfss, "all years")
 ```
 
@@ -165,8 +142,8 @@ retval <- reportSize(brfss, "all years")
 
 ```{r warning=FALSE}
 tsvfile <- file.path(datadir, "brfss_data.tsv")
-write.table(x=brfss, file=tsvfile, row.names=FALSE, fileEncoding="UTF-8", 
-            sep="\t", quote=FALSE, na="\\N", eol="\n")
+write.table(x = brfss, file = tsvfile, row.names = FALSE, fileEncoding = "UTF-8", 
+            sep = "\t", quote = FALSE, na = "\\N", eol = "\n")
 
 # Report file size of TSV file
 retval <- reportFileSize(tsvfile)
