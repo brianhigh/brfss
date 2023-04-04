@@ -26,7 +26,7 @@ datayears <- as.character(seq(2012, 2021))
 ```r
 # Attach packages, installing as needed
 if(!requireNamespace("pacman", quietly = TRUE)) install.packages("pacman")
-pacman::p_load(foreign, data.table, plyr)
+pacman::p_load(foreign, data.table)
 ```
 
 ## Set up data folder
@@ -195,8 +195,8 @@ importDataFile <- function(datadir, datayear) {
     return(dt)
 }
 
-brfss <- as.data.table(adply(.data = datayears, .margins = c(1),
-                       .fun = function(x) importDataFile(datadir, x)))
+brfss <- rbindlist(lapply(datayears, function(x) importDataFile(datadir, x)), 
+                   fill = TRUE)
 ```
 
 ```
