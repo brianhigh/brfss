@@ -47,12 +47,30 @@ result <- map(urls, download_data)
 # Close database connection
 duckdb::dbDisconnect(con, shutdown = TRUE)
 
-# Check that database contains data from years 2017-2021
+# ------------ Tests --------------
+
+# Open database connection
 con <- duckdb::dbConnect(duckdb(), file.path("data", "brfss_data.duckdb"))
+
+# Add two indexes to improve query performance, removing first if already there 
+dbExecute(con, 
+          "DROP INDEX IF EXISTS brfss_iyear_idx;")
+dbExecute(con, 
+          "DROP INDEX IF EXISTS brfss_iyear_state_idx;")
+dbExecute(con, 
+          "CREATE INDEX brfss_iyear_idx ON brfss_data (IYEAR);")
+dbExecute(con, 
+          "CREATE INDEX brfss_iyear_state_idx ON brfss_data (IYEAR, _STATE);")
+
+# Check that database contains data from years 2017-2021
 brfss_data <- tbl(con, "brfss_data")
-result <- brfss_data %>% rename("Year" = IYEAR) %>% 
-  select(Year, SEQNO) %>% 
-  group_by(Year) %>% summarize(Respondents = n()) %>% arrange(Year)
+result <- brfss_data %>% 
+  select("Year" = IYEAR, "State" = `_STATE`) %>% 
+  group_by(Year, State) %>% 
+  summarize(Respondents = n(), .groups = "drop") %>% 
+  arrange(Year, State)
 result %>% show_query()
 result %>% collect()
+
+# Close database connection
 duckdb::dbDisconnect(con, shutdown = TRUE)

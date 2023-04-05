@@ -97,7 +97,7 @@ cat(nrow(rs), "indexes")
 ```
 
 ```
-## 0 indexes
+## 2 indexes
 ```
 
 ## Count Respondents by Year
