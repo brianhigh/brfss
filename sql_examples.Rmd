@@ -24,14 +24,14 @@ editor_options:
 This is a demo of some basic SQL `SELECT` queries using BRFSS data from: 
 http://www.cdc.gov/brfss/. 
 
-We have downloaded the data for each respondent for the years 2017 through 2021.
+We have downloaded the data for each respondent for the years 2012 through 2021.
 
-This dataset has 2,146,371 rows and 358 columns.
+This dataset has 4,506,254 rows and 359 columns.
 
 This dataset will be too large to fit in RAM memory for most desktop and laptop 
 computers.
 
-Instead, we have [exported](download_brfss_into_duckdb.R) the data into a DuckDB database file.
+Instead, we have [exported](download_brfss_into_duckdb.R) the data into a DuckDB database file. This allows access to just the data we need without loading all of it into memory at once.
 
 The CDC has provided a 
 [codebook](https://www.cdc.gov/brfss/annual_data/2021/pdf/codebook21_llcp-v2-508.pdf) 
@@ -186,14 +186,14 @@ ggplot(data=smokers, aes(x=Education, y=Smoking.Prevalence, fill=Education)) +
 
 ## Count Smokers by Education and Year
 
-How has smoking changed from 2017 to 2021?
+How has smoking changed from 2012 to 2021?
 
 ```{r}
 sql <- "SELECT IYEAR AS Year, _EDUCAG AS Education, 
 COUNT(*) AS Respondents, 
 COUNT(IF(USENOW3 = 1 OR USENOW3 = 2, 1, NULL)) AS Smokers
 FROM brfss_data 
-WHERE (IYEAR BETWEEN 2017 AND 2021)
+WHERE (IYEAR BETWEEN 2012 AND 2021)
 AND _STATE = 53 
 AND _EDUCAG <= 4 
 GROUP BY IYEAR, _EDUCAG 
@@ -258,14 +258,14 @@ ggplot(data=drinkers, aes(x=Education, y=Drinking.Prevalence, fill=Education)) +
 
 ## Count Drinkers by Education and Year
 
-Let's see how drinking compares from 2017 to 2021.
+Let's see how drinking compares from 2012 to 2021.
 
 ```{r}
 sql <- "SELECT IYEAR AS Year, _EDUCAG AS Education, 
 COUNT(*) AS Respondents, 
 COUNT(IF(DRNKANY5 = 1, 1, NULL)) AS Drinkers 
 FROM brfss_data 
-WHERE (IYEAR BETWEEN 2011 AND 2021)
+WHERE (IYEAR BETWEEN 2012 AND 2021)
 AND _STATE = 53 
 AND _EDUCAG <= 4 
 GROUP BY IYEAR, _EDUCAG 
@@ -296,7 +296,7 @@ COUNT(*) AS Respondents,
 COUNT(IF(USENOW3 = 1 OR USENOW3 = 2, 1, NULL)) AS Smokers, 
 COUNT(IF(DRNKANY5 = 1, 1, NULL)) AS Drinkers 
 FROM brfss_data 
-WHERE (IYEAR BETWEEN 2017 AND 2021)
+WHERE (IYEAR BETWEEN 2012 AND 2021)
 AND _STATE = 53 
 AND _EDUCAG <= 4 
 GROUP BY IYEAR, _EDUCAG 
@@ -316,7 +316,7 @@ From this dataframe, just subset as needed to produce tables and plots.
 ## Smoking and Drinking Prevalence
 
 ```{r}
-consumers
+consumers %>% head(4) %>% kable()
 ```
 
 ## Smoking and Drinking in Long Format
@@ -330,7 +330,7 @@ library(tidyr)
 consumers <- consumers %>% 
     select(Year, Education, Smoking, Drinking) %>% 
     gather(key=Factor, value=Prevalence, -Year, -Education)
-head(consumers, 8)
+head(consumers, 4) %>% kable()
 ```
 
 ## Smoking and Drinking Prevalence
@@ -356,13 +356,13 @@ Now that you know how to query the database, compare other variables, such as:
 
 ## Speeding up Queries
 
-If we retrieve all of the data for Washington state respondents in 2017-2021,
+If we retrieve all of the data for Washington state respondents in 2012-2021,
 we can just use R commands for subsetting and work entirely from memory.
 
 ```{r message=FALSE}
-# Get a subset of the dataset for 2017-2021 and state of Washington
+# Get a subset of the dataset for 2012-2021 and state of Washington
 sql <- "SELECT * FROM brfss_data 
-WHERE (IYEAR BETWEEN 2017 AND 2021) 
+WHERE (IYEAR BETWEEN 2012 AND 2021) 
 AND _STATE = 53;"
 
 # Use a data.table instead of a data.frame for improved performance
@@ -418,7 +418,7 @@ consumers$Year <- factor(consumers$Year)
 ## Check Results
 
 ```{r}
-consumers %>% data.frame()
+consumers %>% head(4) %>% kable()
 ```
 
 ## Convert to Long Format
@@ -427,7 +427,7 @@ consumers %>% data.frame()
 # Use the same gather() command as before
 consumers <- consumers %>% 
     gather(key=Factor, value=Prevalence, -Year, -Education)
-consumers %>% head(16)
+consumers %>% head(4) %>% kable()
 ```
 
 ## Smoking and Drinking Prevalence
