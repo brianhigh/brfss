@@ -337,7 +337,8 @@ head(consumers, 8)
 
 ```{r}
 ggplot(data=consumers, aes(x=Year, y=Prevalence, group=Factor, color=Factor)) + 
-    geom_line() + facet_grid(Factor ~ Education, scales="free_y")
+    geom_line() + facet_grid(Factor ~ Education, scales="free_y") +
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
 ```
 
 ## Compare other Variables
@@ -434,7 +435,8 @@ consumers %>% head(16)
 ```{r}
 # User the same ggplot() command as before
 ggplot(data=consumers, aes(x=Year, y=Prevalence, group=Factor, color=Factor)) + 
-    geom_line() + facet_grid(Factor ~ Education, scales="free_y")
+    geom_line() + facet_grid(Factor ~ Education, scales="free_y") + 
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
 ```
 
 ## Close Database Connection
