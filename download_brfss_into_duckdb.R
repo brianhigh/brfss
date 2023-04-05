@@ -47,7 +47,7 @@ result <- map(urls[2:5], download_data)
 duckdb::dbDisconnect(con, shutdown = TRUE)
 
 # Check that database contains data from years 2017-2021
-con <- duckdb::dbConnect(duckdb(), brfss_data.duckdb)
+con <- duckdb::dbConnect(duckdb(), "brfss_data.duckdb")
 brfss_data <- tbl(con, "brfss_data")
 result <- brfss_data %>% 
   rename("Year" = IYEAR) %>% select(Year, SEQNO) %>% 
