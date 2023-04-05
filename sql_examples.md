@@ -389,7 +389,6 @@ rs %>% group_by(Year, Education) %>%
 
 ```r
 drinkers$Education <- factor(drinkers$Education, levels=1:4, labels=edu.labels)
-drinkers$Year <- factor(drinkers$Year)
 ggplot(data=drinkers, aes(x=Education, y=Drinking.Prevalence, fill=Year)) +
     geom_bar(stat="identity", position=position_dodge(), colour="black")
 ```
@@ -420,7 +419,6 @@ rs %>% group_by(Year, Education) %>%
            Drinking=Drinkers/Respondents) -> consumers
 consumers$Education <- factor(consumers$Education, levels=1:4, 
                               labels=edu.labels)
-consumers$Year <- factor(consumers$Year)
 ```
 
 From this dataframe, just subset as needed to produce tables and plots.
@@ -436,7 +434,7 @@ consumers %>% head()
 ## # A tibble: 6 × 7
 ## # Groups:   Year, Education [6]
 ##   Year  Education        Respondents Smokers Drinkers Smoking Drinking
-##   <fct> <fct>                  <dbl>   <dbl>    <dbl>   <dbl>    <dbl>
+##   <chr> <fct>                  <dbl>   <dbl>    <dbl>   <dbl>    <dbl>
 ## 1 2012  some school              856      28      291  0.0327    0.340
 ## 2 2012  high school grad        3512     145     1700  0.0413    0.484
 ## 3 2012  some college            4635     116     2650  0.0250    0.572
@@ -464,7 +462,7 @@ consumers %>% head()
 ## # A tibble: 6 × 4
 ## # Groups:   Year, Education [3]
 ##   Year  Education        Factor   Prevalence
-##   <fct> <fct>            <chr>         <dbl>
+##   <chr> <fct>            <chr>         <dbl>
 ## 1 2012  some school      Smoking      0.0327
 ## 2 2012  some school      Drinking     0.340 
 ## 3 2012  high school grad Smoking      0.0413
@@ -560,8 +558,7 @@ consumers <- consumers %>%
             .groups = "keep") %>% 
   mutate(Smoking = Smokers/Respondents, 
          Drinking = Drinkers/Respondents) %>%
-  mutate(Education = factor(Education, levels = 1:4, labels = edu.labels),
-         Year = factor(Year)) %>% 
+  mutate(Education = factor(Education, levels = 1:4, labels = edu.labels)) %>% 
   select(Year, Education, Smoking, Drinking) %>% 
   pivot_longer(c(-Year, -Education), 
                names_to = "Factor", values_to = "Prevalence")
@@ -657,8 +654,7 @@ consumers <- brfsswa1221 %>%
             .groups = "keep") %>% 
   mutate(Smoking = Smokers/Respondents, 
          Drinking = Drinkers/Respondents) %>%
-  mutate(Education = factor(Education, levels = 1:4, labels = edu.labels),
-         Year = factor(Year)) %>% 
+  mutate(Education = factor(Education, levels = 1:4, labels = edu.labels)) %>% 
   select(Year, Education, Smoking, Drinking) %>% 
   pivot_longer(c(-Year, -Education), 
                names_to = "Factor", values_to = "Prevalence")
