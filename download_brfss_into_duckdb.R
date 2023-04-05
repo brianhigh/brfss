@@ -1,18 +1,21 @@
-# Download BRFSS data for a few years and export to a DuckDB database file
+# This script was written by chatGPT with some edits by Brian High
+# 2023-04-04
 
-# Attach packages, installing as needed
-if(!requireNamespace("pacman", quietly = TRUE)) install.packages("pacman")
-pacman::p_load(haven, purrr, dplyr, duckdb)
+# Load necessary packages
+library(haven)
+library(purrr)
+library(dplyr)
+library(duckdb)
 
-# Define base URL and years for BRFSS SAS data files
+# Define base URL and years for BRFSS SAS data
 base_url <- "https://www.cdc.gov/brfss/annual_data/"
 years <- 2017:2021
 
-# Define URLs for each file to be downloaded
+# Define URLs for BRFSS SAS data for years 2017 through 2021
 urls <- paste0(base_url, years, "/files/LLCP", years, "XPT.zip")
 
-# Define function to download, read, and export data for a given year
-download_data <- function(url, ddb_fn = "brfss_data.duckdb") {
+# Define function to download and import data for a given year
+download_data <- function(url) {
   # Download ZIP file and extract XPT file
   temp_file <- tempfile(fileext = ".zip")
   download.file(url, temp_file, mode = "wb")
@@ -25,21 +28,45 @@ download_data <- function(url, ddb_fn = "brfss_data.duckdb") {
   
   # Remove temporary files and folders
   unlink("brfss_data", recursive = TRUE)
-  
-  # If DuckDB file exists, get column names and limit brfss_data to those names
-  if (file.exists(ddb_fn)) {
+
+  # Store data in database
+  if ("brfss_data" %in% dbListTables(con, "brfss_data")) {
     # Append data frame to DuckDB file, restricting to common columns
-    con <- duckdb::dbConnect(duckdb(), ddb_fn)
     brfss_data <- brfss_data %>% select(any_of(dbListFields(con, "brfss_data")))
     duckdb::dbWriteTable(con, "brfss_data", brfss_data, append = TRUE)
-    duckdb::dbDisconnect(con, shutdown = TRUE)
   } else {
-    # Save data frame to new DuckDB file
-    con <- duckdb::dbConnect(duckdb(), ddb_fn)
+    # Save data frame to new DuckDB table
     duckdb::dbWriteTable(con, "brfss_data", brfss_data)
-    duckdb::dbDisconnect(con, shutdown = TRUE)
   }
 }
 
+# Open database connection
+con <- duckdb::dbConnect(duckdb(), "brfss_data.duckdb")
+
 # Download, import, and save data for all years
-result <- map(urls, download_data)
+result <- map(urls[2:5], download_data)
+
+# Close database connection
+duckdb::dbDisconnect(con, shutdown = TRUE)
+
+
+# Check that database contains data from years 2017-2021
+con <- duckdb::dbConnect(duckdb(), brfss_data.duckdb)
+
+query <- '
+SELECT IYEAR AS Year, COUNT(*) AS Respondents
+FROM brfss_data
+GROUP BY IYEAR
+ORDER BY IYEAR;
+'
+
+dbGetQuery(con, query)
+##   Year Respondents
+## 1 2017      438337
+## 2 2018      430153
+## 3 2019      418580
+## 4 2020      408476
+## 5 2021      427317
+## 6 2022       23508
+
+duckdb::dbDisconnect(con, shutdown = TRUE)
