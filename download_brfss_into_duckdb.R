@@ -54,13 +54,10 @@ con <- duckdb::dbConnect(duckdb(), file.path("data", "brfss_data.duckdb"))
 
 # Add two indexes to improve query performance, removing first if already there 
 dbExecute(con, 
-          "DROP INDEX IF EXISTS brfss_iyear_idx;")
-dbExecute(con, 
-          "DROP INDEX IF EXISTS brfss_iyear_state_idx;")
-dbExecute(con, 
-          "CREATE INDEX brfss_iyear_idx ON brfss_data (IYEAR);")
-dbExecute(con, 
-          "CREATE INDEX brfss_iyear_state_idx ON brfss_data (IYEAR, _STATE);")
+          "DROP INDEX IF EXISTS brfss_iyear_idx;
+           DROP INDEX IF EXISTS brfss_iyear_state_idx;
+           CREATE INDEX brfss_iyear_idx ON brfss_data (IYEAR);
+           CREATE INDEX brfss_iyear_state_idx ON brfss_data (IYEAR, _STATE);")
 
 # Check that database contains data from years 2017-2021
 brfss_data <- tbl(con, "brfss_data")
