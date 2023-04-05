@@ -6,7 +6,7 @@ pacman::p_load(haven, purrr, dplyr, duckdb)
 
 # Define base URL and years for BRFSS SAS data
 base_url <- "https://www.cdc.gov/brfss/annual_data/"
-years <- 2017:2021
+years <- 2012:2021
 
 # Define URLs for BRFSS SAS data for years 2017 through 2021
 urls <- paste0(base_url, years, "/files/LLCP", years, "XPT.zip")
@@ -15,7 +15,7 @@ urls <- paste0(base_url, years, "/files/LLCP", years, "XPT.zip")
 download_data <- function(url) {
   # Download ZIP file and extract XPT file
   temp_file <- tempfile(fileext = ".zip")
-  download.file(url, temp_file, mode = "wb")
+  download.file(url, temp_file, mode = "wb", quiet = TRUE)
   on.exit(unlink(temp_file))
   unzip(temp_file, exdir = "brfss_data")
   
@@ -41,7 +41,7 @@ download_data <- function(url) {
 con <- duckdb::dbConnect(duckdb(), "brfss_data.duckdb")
 
 # Download, import, and save data for all years
-result <- map(urls[2:5], download_data)
+result <- map(urls, download_data)
 
 # Close database connection
 duckdb::dbDisconnect(con, shutdown = TRUE)
@@ -49,8 +49,8 @@ duckdb::dbDisconnect(con, shutdown = TRUE)
 # Check that database contains data from years 2017-2021
 con <- duckdb::dbConnect(duckdb(), "brfss_data.duckdb")
 brfss_data <- tbl(con, "brfss_data")
-result <- brfss_data %>% 
-  rename("Year" = IYEAR) %>% select(Year, SEQNO) %>% 
+result <- brfss_data %>% rename("Year" = IYEAR) %>% 
+  select(Year, SEQNO) %>% 
   group_by(Year) %>% summarize(Respondents = n()) %>% arrange(Year)
 result %>% show_query()
 result %>% collect()
