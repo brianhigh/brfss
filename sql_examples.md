@@ -586,17 +586,31 @@ we can just use R commands for subsetting and work entirely from memory.
 
 
 ```r
+# Get all Washington State data from 2012-2021 from database as a dataframe
 brfss_data <- tbl(con, "brfss_data")
 result <- brfss_data %>% 
   filter(IYEAR >= 2012, IYEAR <= 2021, `_STATE` == 53)
 brfsswa1221 <- result %>% collect()
+dim(brfsswa1221)
+```
 
-# Remove columns that contain only NA , zero (0), or the empty string ('')
-brfsswa1221 <- brfsswa1221 %>% 
-  select_if(~ ! (all(is.na(.)) | all(. == 0) | all(. == "")))
+```
+## [1] 131816    359
+```
+
+```r
+# Remove 100 columns that contain only NA , zero (0), or the empty string ('')
+brfsswa1221 <- brfsswa1221 %>% select_if(~ !(all(is.na(.) | . == 0 | . == "")))
+dim(brfsswa1221)
+```
+
+```
+## [1] 131816    249
 ```
 
 ## Check on Memory, Write to File
+
+We will compare the size of the dataset in memory (RAM) and as a file (RDS).
 
 
 ```r
@@ -621,6 +635,8 @@ cat(paste(c("Size of RDS file is",
 ```
 ## Size of RDS file is 8.5 MB
 ```
+
+In the future, if we only want to work with Washington State data from 2012-2021, then we can just read from the RDS file instead of using the Duck DB database.
 
 ## Query, Aggregate and Factor
 
