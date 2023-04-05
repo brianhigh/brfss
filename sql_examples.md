@@ -15,6 +15,8 @@ fig_height: 3.5
 keep_md: yes
 smaller: yes
 logo: logo_128.png
+editor_options: 
+  chunk_output_type: console
 ---
   
 ## SQL Examples: Smoking and Drinking
@@ -493,7 +495,8 @@ head(consumers, 8)
 
 ```r
 ggplot(data=consumers, aes(x=Year, y=Prevalence, group=Factor, color=Factor)) + 
-    geom_line() + facet_grid(Factor ~ Education, scales="free_y")
+    geom_line() + facet_grid(Factor ~ Education, scales="free_y") +
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
 ```
 
 ![](sql_examples_files/figure-html/unnamed-chunk-21-1.png)<!-- -->
@@ -652,7 +655,8 @@ consumers %>% head(16)
 ```r
 # User the same ggplot() command as before
 ggplot(data=consumers, aes(x=Year, y=Prevalence, group=Factor, color=Factor)) + 
-    geom_line() + facet_grid(Factor ~ Education, scales="free_y")
+    geom_line() + facet_grid(Factor ~ Education, scales="free_y") + 
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
 ```
 
 ![](sql_examples_files/figure-html/unnamed-chunk-27-1.png)<!-- -->
