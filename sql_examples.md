@@ -24,14 +24,14 @@ editor_options:
 This is a demo of some basic SQL `SELECT` queries using BRFSS data from: 
 http://www.cdc.gov/brfss/. 
 
-We have downloaded the data for each respondent for the years 2017 through 2021.
+We have downloaded the data for each respondent for the years 2012 through 2021.
 
-This dataset has 2,146,371 rows and 358 columns.
+This dataset has 4,506,254 rows and 359 columns.
 
 This dataset will be too large to fit in RAM memory for most desktop and laptop 
 computers.
 
-Instead, we have [exported](download_brfss_into_duckdb.R) the data into a DuckDB database file.
+Instead, we have [exported](download_brfss_into_duckdb.R) the data into a DuckDB database file. This allows access to just the data we need without loading all of it into memory at once.
 
 The CDC has provided a 
 [codebook](https://www.cdc.gov/brfss/annual_data/2021/pdf/codebook21_llcp-v2-508.pdf) 
@@ -55,7 +55,7 @@ Set `knitr` rendering options and the default number of digits for printing.
 
 
 ```r
-opts_chunk$set(tidy=FALSE, cache=TRUE)
+opts_chunk$set(tidy=FALSE, cache=FALSE)
 options(digits=4)
 ```
 
@@ -81,7 +81,7 @@ cat(rs$rows, "rows")
 ```
 
 ```
-## 2146371 rows
+## 4506254 rows
 ```
 
 ```r
@@ -91,7 +91,7 @@ cat(ncol(rs), "columns")
 ```
 
 ```
-## 358 columns
+## 359 columns
 ```
 
 ```r
@@ -120,13 +120,18 @@ dbGetQuery(con, sql)
 ```
 
 ```
-##   Year Respondents
-## 1 2017       13272
-## 2 2018       13106
-## 3 2019       12987
-## 4 2020       12673
-## 5 2021       12830
-## 6 2022         568
+##    Year Respondents
+## 1  2012       15319
+## 2  2013       11158
+## 3  2014       10086
+## 4  2015       16105
+## 5  2016       14263
+## 6  2017       13289
+## 7  2018       13106
+## 8  2019       12987
+## 9  2020       12673
+## 10 2021       12830
+## 11 2022         568
 ```
 
 ## Respondents per Education Level
@@ -274,7 +279,7 @@ ggplot(data=smokers, aes(x=Education, y=Smoking.Prevalence, fill=Education)) +
 
 ## Count Smokers by Education and Year
 
-How has smoking changed from 2017 to 2021?
+How has smoking changed from 2012 to 2021?
 
 
 ```r
@@ -282,7 +287,7 @@ sql <- "SELECT IYEAR AS Year, _EDUCAG AS Education,
 COUNT(*) AS Respondents, 
 COUNT(IF(USENOW3 = 1 OR USENOW3 = 2, 1, NULL)) AS Smokers
 FROM brfss_data 
-WHERE (IYEAR BETWEEN 2017 AND 2021)
+WHERE (IYEAR BETWEEN 2012 AND 2021)
 AND _STATE = 53 
 AND _EDUCAG <= 4 
 GROUP BY IYEAR, _EDUCAG 
@@ -366,7 +371,7 @@ ggplot(data=drinkers, aes(x=Education, y=Drinking.Prevalence, fill=Education)) +
 
 ## Count Drinkers by Education and Year
 
-Let's see how drinking compares from 2017 to 2021.
+Let's see how drinking compares from 2012 to 2021.
 
 
 ```r
@@ -374,7 +379,7 @@ sql <- "SELECT IYEAR AS Year, _EDUCAG AS Education,
 COUNT(*) AS Respondents, 
 COUNT(IF(DRNKANY5 = 1, 1, NULL)) AS Drinkers 
 FROM brfss_data 
-WHERE (IYEAR BETWEEN 2011 AND 2021)
+WHERE (IYEAR BETWEEN 2012 AND 2021)
 AND _STATE = 53 
 AND _EDUCAG <= 4 
 GROUP BY IYEAR, _EDUCAG 
@@ -409,7 +414,7 @@ COUNT(*) AS Respondents,
 COUNT(IF(USENOW3 = 1 OR USENOW3 = 2, 1, NULL)) AS Smokers, 
 COUNT(IF(DRNKANY5 = 1, 1, NULL)) AS Drinkers 
 FROM brfss_data 
-WHERE (IYEAR BETWEEN 2017 AND 2021)
+WHERE (IYEAR BETWEEN 2012 AND 2021)
 AND _STATE = 53 
 AND _EDUCAG <= 4 
 GROUP BY IYEAR, _EDUCAG 
@@ -430,35 +435,17 @@ From this dataframe, just subset as needed to produce tables and plots.
 
 
 ```r
-consumers
+consumers %>% head(4) %>% kable()
 ```
 
-```
-## # A tibble: 20 × 7
-## # Groups:   Year, Education [20]
-##    Year  Education        Respondents Smokers Drinkers Smoking Drinking
-##    <fct> <fct>                  <dbl>   <dbl>    <dbl>   <dbl>    <dbl>
-##  1 2017  some school              756      32      269  0.0423    0.356
-##  2 2017  high school grad        2906     116     1308  0.0399    0.450
-##  3 2017  some college            3856     115     2036  0.0298    0.528
-##  4 2017  college grad            5693      93     3695  0.0163    0.649
-##  5 2018  some school              757      18      231  0.0238    0.305
-##  6 2018  high school grad        2876     130     1221  0.0452    0.425
-##  7 2018  some college            4012      99     2074  0.0247    0.517
-##  8 2018  college grad            5394      72     3402  0.0133    0.631
-##  9 2019  some school              749      27      222  0.0360    0.296
-## 10 2019  high school grad        2816     119     1219  0.0423    0.433
-## 11 2019  some college            3910     112     1923  0.0286    0.492
-## 12 2019  college grad            5445      82     3401  0.0151    0.625
-## 13 2020  some school              691      17      228  0.0246    0.330
-## 14 2020  high school grad        2809     105     1256  0.0374    0.447
-## 15 2020  some college            3800     105     1961  0.0276    0.516
-## 16 2020  college grad            5310      66     3232  0.0124    0.609
-## 17 2021  some school              618      28      181  0.0453    0.293
-## 18 2021  high school grad        2543      96     1118  0.0378    0.440
-## 19 2021  some college            3693      83     1849  0.0225    0.501
-## 20 2021  college grad            5884      87     3682  0.0148    0.626
-```
+
+
+|Year |Education        | Respondents| Smokers| Drinkers| Smoking| Drinking|
+|:----|:----------------|-----------:|-------:|--------:|-------:|--------:|
+|2012 |some school      |         856|      28|      291|  0.0327|   0.3400|
+|2012 |high school grad |        3512|     145|     1700|  0.0413|   0.4841|
+|2012 |some college     |        4635|     116|     2650|  0.0250|   0.5717|
+|2012 |college grad     |        6280|      99|     4330|  0.0158|   0.6895|
 
 ## Smoking and Drinking in Long Format
 
@@ -472,23 +459,17 @@ library(tidyr)
 consumers <- consumers %>% 
     select(Year, Education, Smoking, Drinking) %>% 
     gather(key=Factor, value=Prevalence, -Year, -Education)
-head(consumers, 8)
+head(consumers, 4) %>% kable()
 ```
 
-```
-## # A tibble: 8 × 4
-## # Groups:   Year, Education [8]
-##   Year  Education        Factor  Prevalence
-##   <fct> <fct>            <chr>        <dbl>
-## 1 2017  some school      Smoking     0.0423
-## 2 2017  high school grad Smoking     0.0399
-## 3 2017  some college     Smoking     0.0298
-## 4 2017  college grad     Smoking     0.0163
-## 5 2018  some school      Smoking     0.0238
-## 6 2018  high school grad Smoking     0.0452
-## 7 2018  some college     Smoking     0.0247
-## 8 2018  college grad     Smoking     0.0133
-```
+
+
+|Year |Education        |Factor  | Prevalence|
+|:----|:----------------|:-------|----------:|
+|2012 |some school      |Smoking |     0.0327|
+|2012 |high school grad |Smoking |     0.0413|
+|2012 |some college     |Smoking |     0.0250|
+|2012 |college grad     |Smoking |     0.0158|
 
 ## Smoking and Drinking Prevalence
 
@@ -516,14 +497,14 @@ Now that you know how to query the database, compare other variables, such as:
 
 ## Speeding up Queries
 
-If we retrieve all of the data for Washington state respondents in 2017-2021,
+If we retrieve all of the data for Washington state respondents in 2012-2021,
 we can just use R commands for subsetting and work entirely from memory.
 
 
 ```r
-# Get a subset of the dataset for 2017-2021 and state of Washington
+# Get a subset of the dataset for 2012-2021 and state of Washington
 sql <- "SELECT * FROM brfss_data 
-WHERE (IYEAR BETWEEN 2017 AND 2021) 
+WHERE (IYEAR BETWEEN 2012 AND 2021) 
 AND _STATE = 53;"
 
 # Use a data.table instead of a data.frame for improved performance
@@ -546,7 +527,7 @@ cat("The data table consumes", object.size(brfsswa1721) / 1024^2, "MB",
 ```
 
 ```
-## The data table consumes 125.9 MB with 64868 observations and 246 variables
+## The data table consumes 250.7 MB with 131816 observations and 249 variables
 ```
 
 ```r
@@ -592,32 +573,17 @@ consumers$Year <- factor(consumers$Year)
 
 
 ```r
-consumers %>% data.frame()
+consumers %>% head(4) %>% kable()
 ```
 
-```
-##    Year        Education Smoking Drinking
-## 1  2017      some school 0.04233   0.3558
-## 2  2017 high school grad 0.03992   0.4501
-## 3  2017     some college 0.02982   0.5280
-## 4  2017     college grad 0.01634   0.6490
-## 5  2018      some school 0.02378   0.3052
-## 6  2018 high school grad 0.04520   0.4245
-## 7  2018     some college 0.02468   0.5169
-## 8  2018     college grad 0.01335   0.6307
-## 9  2019      some school 0.03605   0.2964
-## 10 2019 high school grad 0.04226   0.4329
-## 11 2019     some college 0.02864   0.4918
-## 12 2019     college grad 0.01506   0.6246
-## 13 2020      some school 0.02460   0.3300
-## 14 2020 high school grad 0.03738   0.4471
-## 15 2020     some college 0.02763   0.5161
-## 16 2020     college grad 0.01243   0.6087
-## 17 2021      some school 0.04531   0.2929
-## 18 2021 high school grad 0.03775   0.4396
-## 19 2021     some college 0.02247   0.5007
-## 20 2021     college grad 0.01479   0.6258
-```
+
+
+|Year |Education        | Smoking| Drinking|
+|:----|:----------------|-------:|--------:|
+|2012 |some school      |  0.0327|   0.3400|
+|2012 |high school grad |  0.0413|   0.4841|
+|2012 |some college     |  0.0250|   0.5717|
+|2012 |college grad     |  0.0158|   0.6895|
 
 ## Convert to Long Format
 
@@ -626,28 +592,17 @@ consumers %>% data.frame()
 # Use the same gather() command as before
 consumers <- consumers %>% 
     gather(key=Factor, value=Prevalence, -Year, -Education)
-consumers %>% head(16)
+consumers %>% head(4) %>% kable()
 ```
 
-```
-##    Year        Education  Factor Prevalence
-## 1  2017      some school Smoking    0.04233
-## 2  2017 high school grad Smoking    0.03992
-## 3  2017     some college Smoking    0.02982
-## 4  2017     college grad Smoking    0.01634
-## 5  2018      some school Smoking    0.02378
-## 6  2018 high school grad Smoking    0.04520
-## 7  2018     some college Smoking    0.02468
-## 8  2018     college grad Smoking    0.01335
-## 9  2019      some school Smoking    0.03605
-## 10 2019 high school grad Smoking    0.04226
-## 11 2019     some college Smoking    0.02864
-## 12 2019     college grad Smoking    0.01506
-## 13 2020      some school Smoking    0.02460
-## 14 2020 high school grad Smoking    0.03738
-## 15 2020     some college Smoking    0.02763
-## 16 2020     college grad Smoking    0.01243
-```
+
+
+|Year |Education        |Factor  | Prevalence|
+|:----|:----------------|:-------|----------:|
+|2012 |some school      |Smoking |     0.0327|
+|2012 |high school grad |Smoking |     0.0413|
+|2012 |some college     |Smoking |     0.0250|
+|2012 |college grad     |Smoking |     0.0158|
 
 ## Smoking and Drinking Prevalence
 
