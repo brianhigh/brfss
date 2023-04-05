@@ -1,11 +1,8 @@
-# This script was written by chatGPT with some edits by Brian High
-# 2023-04-04
+# Download BRFSS data for a few years and export to a DuckDB database file
 
-# Load necessary packages
-library(haven)
-library(purrr)
-library(dplyr)
-library(duckdb)
+# Attach packages, installing as needed
+if(!requireNamespace("pacman", quietly = TRUE)) install.packages("pacman")
+pacman::p_load(haven, purrr, dplyr, duckdb)
 
 # Define base URL and years for BRFSS SAS data
 base_url <- "https://www.cdc.gov/brfss/annual_data/"
@@ -49,24 +46,12 @@ result <- map(urls[2:5], download_data)
 # Close database connection
 duckdb::dbDisconnect(con, shutdown = TRUE)
 
-
 # Check that database contains data from years 2017-2021
 con <- duckdb::dbConnect(duckdb(), brfss_data.duckdb)
-
-query <- '
-SELECT IYEAR AS Year, COUNT(*) AS Respondents
-FROM brfss_data
-GROUP BY IYEAR
-ORDER BY IYEAR;
-'
-
-dbGetQuery(con, query)
-##   Year Respondents
-## 1 2017      438337
-## 2 2018      430153
-## 3 2019      418580
-## 4 2020      408476
-## 5 2021      427317
-## 6 2022       23508
-
+brfss_data <- tbl(con, "brfss_data")
+result <- brfss_data %>% 
+  rename("Year" = IYEAR) %>% select(Year, SEQNO) %>% 
+  group_by(Year) %>% summarize(Respondents = n()) %>% arrange(Year)
+result %>% show_query()
+result %>% collect()
 duckdb::dbDisconnect(con, shutdown = TRUE)
