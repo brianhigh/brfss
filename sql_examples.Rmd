@@ -24,20 +24,16 @@ editor_options:
 This is a demo of some basic SQL `SELECT` queries using BRFSS data from: 
 http://www.cdc.gov/brfss/. 
 
-We have downloaded the data for each respondent for the years 2012 through 2021.
+We have downloaded the data for each respondent for the years 2012 through 2021. This dataset has 4,506,254 rows and 840 columns when [combined into a dataframe](get-brfss-data.md).
 
-This dataset has 4,506,254 rows and 359 columns.
+This dataset will be too large to fit in memory for most desktop and laptop 
+computers. When this entire dataset is loaded into memory as an R dataframe, it consumes almost 30 GB of RAM. As of 2023, most workstations have only 16 GB of RAM or less.
 
-This dataset will be too large to fit in RAM memory for most desktop and laptop 
-computers.
-
-Instead, we have [exported](download_brfss_into_duckdb.R) the data into a DuckDB database file. This allows access to just the data we need without loading all of it into memory at once.
+Instead, we have [exported](download_brfss_into_duckdb.R) the data into a DuckDB database file. This allows access to just the data we need without loading all of it into memory at once. We have also limited the number of variables to only those present (359) in the first year's (2012) dataset.
 
 The CDC has provided a 
 [codebook](https://www.cdc.gov/brfss/annual_data/2021/pdf/codebook21_llcp-v2-508.pdf) 
-for use in understanding variables and codes.
-
-In particular, we will focus on tobacco use and alcohol consumption in 
+for use in understanding variables and codes. In particular, we will focus on tobacco use and alcohol consumption in 
 the state of Washington.
 
 ## Install Packages and Set Options
