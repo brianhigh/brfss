@@ -48,14 +48,14 @@ Load the required R packages, installing as necessary.
 ```r
 # Attach packages, installing as needed
 if(!requireNamespace("pacman", quietly = TRUE)) install.packages("pacman")
-pacman::p_load(knitr, dplyr, ggplot2, tidyr, data.table, duckdb)
+pacman::p_load(knitr, dplyr, ggplot2, tidyr, duckdb)
 ```
 
 Set `knitr` rendering options and the default number of digits for printing.
 
 
 ```r
-opts_chunk$set(tidy=FALSE, cache=TRUE)
+opts_chunk$set(tidy=FALSE, cache=FALSE)
 options(digits=4)
 ```
 
@@ -225,7 +225,6 @@ is the number of smokers as a fraction of respondents for each education level.
 
 
 ```r
-library(dplyr)
 rs %>% group_by(Education) %>% 
     mutate(Smoking.Prevalence=Smokers/Respondents) -> smokers
 smokers
@@ -270,7 +269,6 @@ smokers
 
 
 ```r
-library(ggplot2)
 ggplot(data=smokers, aes(x=Education, y=Smoking.Prevalence, fill=Education)) +
     geom_bar(stat="identity")
 ```
@@ -435,41 +433,49 @@ From this dataframe, just subset as needed to produce tables and plots.
 
 
 ```r
-consumers %>% head(4) %>% kable()
+consumers %>% head()
 ```
 
-
-
-|Year |Education        | Respondents| Smokers| Drinkers| Smoking| Drinking|
-|:----|:----------------|-----------:|-------:|--------:|-------:|--------:|
-|2012 |some school      |         856|      28|      291|  0.0327|   0.3400|
-|2012 |high school grad |        3512|     145|     1700|  0.0413|   0.4841|
-|2012 |some college     |        4635|     116|     2650|  0.0250|   0.5717|
-|2012 |college grad     |        6280|      99|     4330|  0.0158|   0.6895|
+```
+## # A tibble: 6 × 7
+## # Groups:   Year, Education [6]
+##   Year  Education        Respondents Smokers Drinkers Smoking Drinking
+##   <fct> <fct>                  <dbl>   <dbl>    <dbl>   <dbl>    <dbl>
+## 1 2012  some school              856      28      291  0.0327    0.340
+## 2 2012  high school grad        3512     145     1700  0.0413    0.484
+## 3 2012  some college            4635     116     2650  0.0250    0.572
+## 4 2012  college grad            6280      99     4330  0.0158    0.689
+## 5 2013  some school              581      22      196  0.0379    0.337
+## 6 2013  high school grad        2578     114     1242  0.0442    0.482
+```
 
 ## Smoking and Drinking in Long Format
 
 To facilitate plotting, we will want to group by consumption type. To do this,
 we will need to convert the data structure from "wide" to "long" format. The
-`gather()` function of the `tidyr` package makes this easy.
+`pivot_longer()` function of the `tidyr` package makes this easy.
 
 
 ```r
-library(tidyr)
 consumers <- consumers %>% 
-    select(Year, Education, Smoking, Drinking) %>% 
-    gather(key=Factor, value=Prevalence, -Year, -Education)
-head(consumers, 4) %>% kable()
+  select(Year, Education, Smoking, Drinking) %>% 
+  pivot_longer(c(-Year, -Education), 
+               names_to = "Factor", values_to = "Prevalence")
+consumers %>% head()
 ```
 
-
-
-|Year |Education        |Factor  | Prevalence|
-|:----|:----------------|:-------|----------:|
-|2012 |some school      |Smoking |     0.0327|
-|2012 |high school grad |Smoking |     0.0413|
-|2012 |some college     |Smoking |     0.0250|
-|2012 |college grad     |Smoking |     0.0158|
+```
+## # A tibble: 6 × 4
+## # Groups:   Year, Education [3]
+##   Year  Education        Factor   Prevalence
+##   <fct> <fct>            <chr>         <dbl>
+## 1 2012  some school      Smoking      0.0327
+## 2 2012  some school      Drinking     0.340 
+## 3 2012  high school grad Smoking      0.0413
+## 4 2012  high school grad Drinking     0.484 
+## 5 2012  some college     Smoking      0.0250
+## 6 2012  some college     Drinking     0.572
+```
 
 ## Smoking and Drinking Prevalence
 
@@ -495,6 +501,88 @@ Now that you know how to query the database, compare other variables, such as:
 - Life satisfaction (`LSATISFY`) and social/emotional support (`EMTSUPRT)`
 - What are *you* curious about?
 
+## Alternative to Writing SQL
+
+Wouldn't it be nice to do this in R without having to write SQL too? 
+
+You can use the `dbplyr` package, which will automatically load if `dplyr` 
+is loaded, to translate R code to SQL for you. This allows you to use R
+code instead if SQL to get your data from the database.
+
+
+```r
+brfss_data <- tbl(con, "brfss_data")
+result <- brfss_data %>% 
+  rename("Year" = IYEAR, "Education" = `_EDUCAG`, State = `_STATE`) %>% 
+  select(Year, Education, State, USENOW3, DRNKANY5) %>%
+  filter(Year >= 2012, Year <= 2021, State == 53, Education <= 4)
+```
+
+## View the SQL Query
+
+While this didn't actually execute the query and return the dataset, it did
+create a SQL query that we'll use next.
+
+
+```r
+result %>% show_query()
+```
+
+```
+## <SQL>
+## SELECT *
+## FROM (
+##   SELECT
+##     IYEAR AS "Year",
+##     _EDUCAG AS Education,
+##     _STATE AS State,
+##     USENOW3,
+##     DRNKANY5
+##   FROM brfss_data
+## ) q01
+## WHERE
+##   ("Year" >= 2012.0) AND
+##   ("Year" <= 2021.0) AND
+##   (State = 53.0) AND
+##   (Education <= 4.0)
+```
+
+## Prepare Data for Plotting
+
+To actually execute the SQL query, we use `collect()`. Then we perform the same steps as we did previously on the SQL query results, but using R instead of a mix of R and SQL.
+
+
+```r
+consumers <- result %>% collect()
+consumers <- consumers %>% 
+  mutate(Smoker = ifelse(USENOW3 %in% 1:2, 1, 0)) %>% 
+  mutate(Drinker = ifelse(DRNKANY5 == 1, 1, 0)) %>% 
+  group_by(Year, Education) %>% 
+  summarize(Respondents = n(), 
+            Smokers = sum(Smoker, na.rm = TRUE),
+            Drinkers = sum(Drinker, na.rm = TRUE),
+            .groups = "keep") %>% 
+  mutate(Smoking = Smokers/Respondents, 
+         Drinking = Drinkers/Respondents) %>%
+  mutate(Education = factor(Education, levels = 1:4, labels = edu.labels),
+         Year = factor(Year)) %>% 
+  select(Year, Education, Smoking, Drinking) %>% 
+  pivot_longer(c(-Year, -Education), 
+               names_to = "Factor", values_to = "Prevalence")
+```
+
+## Plot dbplyr Results
+
+
+```r
+# Use the same ggplot() command as before
+ggplot(data=consumers, aes(x=Year, y=Prevalence, group=Factor, color=Factor)) + 
+    geom_line() + facet_grid(Factor ~ Education, scales="free_y") + 
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+```
+
+![](sql_examples_files/figure-html/unnamed-chunk-25-1.png)<!-- -->
+
 ## Speeding up Queries
 
 If we retrieve all of the data for Washington state respondents in 2012-2021,
@@ -502,18 +590,14 @@ we can just use R commands for subsetting and work entirely from memory.
 
 
 ```r
-# Get a subset of the dataset for 2012-2021 and state of Washington
-sql <- "SELECT * FROM brfss_data 
-WHERE (IYEAR BETWEEN 2012 AND 2021) 
-AND _STATE = 53;"
-
-# Use a data.table instead of a data.frame for improved performance
-library(data.table)
-brfsswa1721 <- as.data.table(dbGetQuery(con, sql))
+brfss_data <- tbl(con, "brfss_data")
+result <- brfss_data %>% 
+  filter(IYEAR >= 2012, IYEAR <= 2021, `_STATE` == 53)
+brfsswa1221 <- result %>% collect()
 
 # Remove columns that contain only NA , zero (0), or the empty string ('')
-brfsswa1721 <- brfsswa1721[, which(unlist(lapply(
-    brfsswa1721, function(x) ! all(is.na(x) | x==0 | x=='')))), with=FALSE]
+brfsswa1221 <- brfsswa1221 %>% 
+  select_if(~ ! (all(is.na(.)) | all(. == 0) | all(. == "")))
 ```
 
 ## Check on Memory, Write to File
@@ -521,9 +605,9 @@ brfsswa1721 <- brfsswa1721[, which(unlist(lapply(
 
 ```r
 # Report data table size and dimensions
-cat("The data table consumes", object.size(brfsswa1721) / 1024^2, "MB", 
-    "with", dim(brfsswa1721)[1], "observations and", 
-    dim(brfsswa1721)[2], "variables", "\n")
+cat("The data table consumes", object.size(brfsswa1221) / 1024^2, "MB", 
+    "with", dim(brfsswa1221)[1], "observations and", 
+    dim(brfsswa1221)[2], "variables", "\n")
 ```
 
 ```
@@ -532,89 +616,53 @@ cat("The data table consumes", object.size(brfsswa1721) / 1024^2, "MB",
 
 ```r
 # Save as a RDS and check on the size
-filename <- "brfsswa1721.rds"
-if (! file.exists(filename)) saveRDS(brfsswa1721, filename)
+filename <- "brfsswa1221.rds"
+if (! file.exists(filename)) saveRDS(brfsswa1221, filename)
 cat(paste(c("Size of RDS file is", 
             round(file.size(filename) / 1024^2, 1), "MB", "\n")))
 ```
 
 ```
-## Size of RDS file is 5.3 MB
+## Size of RDS file is 8.5 MB
 ```
 
 ## Query, Aggregate and Factor
 
-We can test our `data.table` by reproducing our SQL query with R commands.
+We can test our subset by reproducing our SQL query with R commands as before.
 
 
 ```r
-# Rename columns to match our SQL results
-setnames(brfsswa1721, "IYEAR", "Year")
-setnames(brfsswa1721, "_EDUCAG", "Education")
-
-# Use order() to set sort order like in SQL
-brfsswa1721 <- brfsswa1721[order(Year, Education)]
-
-# Use DT[i, j, by=...] syntax to query and aggregate like in SQL
-consumers <- brfsswa1721[Education <= 4, list(
-    Smoking = sum(USENOW3 == 1 | USENOW3 == 2, na.rm = TRUE)/.N,
-    Drinking = sum(DRNKANY5 == 1, na.rm = TRUE)/.N), 
-    by = list(Year, Education)]
-
-# Use the same factor() commands as before
-edu.labels <- c("some school", "high school grad", 
-                "some college", "college grad")
-consumers$Education <- factor(consumers$Education, levels=1:4, 
-                              labels=edu.labels)
-consumers$Year <- factor(consumers$Year)
+consumers <- brfsswa1221 %>%
+  rename("Year" = IYEAR, "Education" = `_EDUCAG`, State = `_STATE`) %>% 
+  select(Year, Education, State, USENOW3, DRNKANY5) %>%
+  filter(Year >= 2012, Year <= 2021, State == 53, Education <= 4) %>% 
+  mutate(Smoker = ifelse(USENOW3 %in% 1:2, 1, 0)) %>% 
+  mutate(Drinker = ifelse(DRNKANY5 == 1, 1, 0)) %>% 
+  group_by(Year, Education) %>% 
+  summarize(Respondents = n(), 
+            Smokers = sum(Smoker, na.rm = TRUE),
+            Drinkers = sum(Drinker, na.rm = TRUE),
+            .groups = "keep") %>% 
+  mutate(Smoking = Smokers/Respondents, 
+         Drinking = Drinkers/Respondents) %>%
+  mutate(Education = factor(Education, levels = 1:4, labels = edu.labels),
+         Year = factor(Year)) %>% 
+  select(Year, Education, Smoking, Drinking) %>% 
+  pivot_longer(c(-Year, -Education), 
+               names_to = "Factor", values_to = "Prevalence")
 ```
-
-## Check Results
-
-
-```r
-consumers %>% head(4) %>% kable()
-```
-
-
-
-|Year |Education        | Smoking| Drinking|
-|:----|:----------------|-------:|--------:|
-|2012 |some school      |  0.0327|   0.3400|
-|2012 |high school grad |  0.0413|   0.4841|
-|2012 |some college     |  0.0250|   0.5717|
-|2012 |college grad     |  0.0158|   0.6895|
-
-## Convert to Long Format
-
-
-```r
-# Use the same gather() command as before
-consumers <- consumers %>% 
-    gather(key=Factor, value=Prevalence, -Year, -Education)
-consumers %>% head(4) %>% kable()
-```
-
-
-
-|Year |Education        |Factor  | Prevalence|
-|:----|:----------------|:-------|----------:|
-|2012 |some school      |Smoking |     0.0327|
-|2012 |high school grad |Smoking |     0.0413|
-|2012 |some college     |Smoking |     0.0250|
-|2012 |college grad     |Smoking |     0.0158|
 
 ## Smoking and Drinking Prevalence
 
 
 ```r
-# User the same ggplot() command as before
+# Use the same ggplot() command as before
 ggplot(data=consumers, aes(x=Year, y=Prevalence, group=Factor, color=Factor)) + 
     geom_line() + facet_grid(Factor ~ Education, scales="free_y") + 
     theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
 ```
 
-![](sql_examples_files/figure-html/unnamed-chunk-27-1.png)<!-- -->
+![](sql_examples_files/figure-html/unnamed-chunk-29-1.png)<!-- -->
 
 ## Close Database Connection
 
