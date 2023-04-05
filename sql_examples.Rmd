@@ -3,34 +3,38 @@ title: "Smoking and Drinking"
 author: "Brian High"
 date: "![CC BY-SA 4.0](cc_by-sa_4.png)"
 output: 
-    ioslides_presentation:
-        fig_width: 8.5
-        fig_height: 3.5
-        keep_md: yes
-        smaller: yes
-        logo: logo_128.png
+  ioslides_presentation:
+    fig_caption: yes
+    fig_retina: 1
+    fig_width: 7
+    fig_height: 4
+    keep_md: yes
+    smaller: yes
+fig_width: 8.5
+fig_height: 3.5
+keep_md: yes
+smaller: yes
+logo: logo_128.png
+editor_options: 
+  chunk_output_type: console
 ---
-
+  
 ## SQL Examples: Smoking and Drinking
-
+  
 This is a demo of some basic SQL `SELECT` queries using BRFSS data from: 
 http://www.cdc.gov/brfss/. 
 
-We have downloaded the data for each respondent for the years 2005 through 2014.
+We have downloaded the data for each respondent for the years 2017 through 2021.
 
-This dataset has 4,379,516 rows and 999 columns.
+This dataset has 2,146,371 rows and 358 columns.
 
 This dataset will be too large to fit in RAM memory for most desktop and laptop 
 computers.
 
-When exported as a TSV file, this file is 13 GB. When loaded into R as a data 
-table, the memory consumed is almost 33 GB.
-
-Instead, we have imported the data into a MySQL database table. We have indexed
-the table on survey year and state to improve performance.
+Instead, we have [exported](download_brfss_into_duckdb.R) the data into a DuckDB database file.
 
 The CDC has provided a 
-[codebook](http://www.cdc.gov/brfss/annual_data/2014/pdf/codebook14_llcp.pdf) 
+[codebook](https://www.cdc.gov/brfss/annual_data/2021/pdf/codebook21_llcp-v2-508.pdf) 
 for use in understanding variables and codes.
 
 In particular, we will focus on tobacco use and alcohol consumption in 
@@ -41,14 +45,9 @@ the state of Washington.
 Load the required R packages, installing as necessary.
 
 ```{r, echo=TRUE, message=FALSE}
-for (pkg in c("knitr", "RMySQL", "dplyr", "ggplot2", "tidyr", "data.table")) {
-    if (! suppressWarnings(require(pkg, character.only=TRUE)) ) {
-        install.packages(pkg, repos="http://cran.fhcrc.org", dependencies=TRUE)
-        if (! suppressWarnings(require(pkg, character.only=TRUE)) ) {
-            stop(paste0(c("Can't load package: ", pkg, "!"), collapse = ""))
-        }
-    }
-}
+# Attach packages, installing as needed
+if(!requireNamespace("pacman", quietly = TRUE)) install.packages("pacman")
+pacman::p_load(knitr, dplyr, ggplot2, tidyr, data.table, duckdb)
 ```
 
 Set `knitr` rendering options and the default number of digits for printing.
@@ -58,57 +57,40 @@ opts_chunk$set(tidy=FALSE, cache=TRUE)
 options(digits=4)
 ```
 
-## Connect to MySQL Database
+## Connect to DuckDB Database
 
-We will connect to the `localhost` and `brfss` database using an `anonymous` 
-account.
+Connect to the DuckDB database file.
 
 ```{r message=FALSE, cache=FALSE}
-library(RMySQL)
-
-con <- dbConnect(MySQL(), 
-                 host="localhost", 
-                 username="anonymous", 
-                 password="Ank7greph-", 
-                 dbname="brfss")
+ddb_fn <- "brfss_data.duckdb"
+con <- duckdb::dbConnect(duckdb(), ddb_fn)
 ```
-
-It's generally a *bad* idea to put your connection credentials in your script,
-and an even *worse* idea to publish these on Github. *Don't be like me!*
-
-```{r}
-if (file.exists("con.R")) source("con.R")
-```
-
-A lesser evil is to put them in a separate file that you keep secure and private.
-
-Even better would be to configure your system to prompt you for the password.
 
 ## Table Size
 
-Print the number of rows and columns, as well as table and index size.
+Print the number of rows and columns, as well as number of indexes.
 
 ```{r}
-sql <- "SELECT COUNT(*) AS rows FROM brfss;"
+sql <- "SELECT COUNT(*) AS rows FROM brfss_data;"
 rs <- dbGetQuery(con, sql)
 cat(rs$rows, "rows")
-sql <- "SELECT * FROM brfss LIMIT 1;"
+sql <- "SELECT * FROM brfss_data LIMIT 1;"
 rs <- dbGetQuery(con, sql)
 cat(ncol(rs), "columns")
-sql <- "SHOW TABLE STATUS IN brfss;"
+sql <- "select * from duckdb_indexes;"
 rs <- dbGetQuery(con, sql)
-cat(sum(rs[1, c("Data_length", "Index_length")]) / (1024^3), "GB")
+cat(nrow(rs), "indexes")
 ```
 
 ## Count Respondents by Year
 
 Let's count (`COUNT`) the number of respondents per year (`GROUP BY`) in 
-Washington state (`X_STATE = 53`), sorting by year (`ORDER BY`).
+Washington state (`_STATE = 53`), sorting by year (`ORDER BY`).
 
 ```{r}
 sql <- "SELECT IYEAR AS Year, COUNT(*) AS Respondents 
-        FROM brfss 
-        WHERE X_STATE = 53 
+        FROM brfss_data 
+        WHERE _STATE = 53 
         GROUP BY IYEAR 
         ORDER BY IYEAR;"
 dbGetQuery(con, sql)
@@ -116,18 +98,18 @@ dbGetQuery(con, sql)
 
 ## Respondents per Education Level
 
-Look at the number of respondents in 2014 and aggregate by education level.
+Look at the number of respondents in 2021 and aggregate by education level.
 
 ```{r}
-sql <- "SELECT X_EDUCAG AS Education, COUNT(*) AS Respondents 
-        FROM brfss 
-        WHERE IYEAR = 2014 AND X_STATE = 53 
-        GROUP BY X_EDUCAG 
-        ORDER BY X_EDUCAG;"
+sql <- "SELECT _EDUCAG AS Education, COUNT(*) AS Respondents 
+        FROM brfss_data 
+        WHERE IYEAR = 2021 AND _STATE = 53 
+        GROUP BY _EDUCAG 
+        ORDER BY _EDUCAG;"
 dbGetQuery(con, sql)
 ```
 
-The education level (`X_EDUCAG`) is an integer from 1-4 (or 9 meaning 
+The education level (`_EDUCAG`) is an integer from 1-4 (or 9 meaning 
 "Don't know", "Missing", etc.). Do we see a trend? Is our sample skewed?
 
 ## Count Smokers by Education Level
@@ -137,13 +119,13 @@ a smoker or not. A value of `1` (Every day) or `2` (Some days) means
 "is a smoker".
 
 ```{r}
-sql <- "SELECT X_EDUCAG AS Education, 
-        COUNT(USENOW3) AS Smokers 
-        FROM brfss 
-        WHERE IYEAR = 2014 AND X_STATE = 53 AND X_EDUCAG <= 4 
-              AND (USENOW3 = 1 OR USENOW3 = 2) 
-        GROUP BY X_EDUCAG 
-        ORDER BY X_EDUCAG;"
+sql <- "SELECT _EDUCAG AS Education, 
+COUNT(USENOW3) AS Smokers 
+FROM brfss_data 
+WHERE IYEAR = 2021 AND _STATE = 53 AND _EDUCAG <= 4 
+AND (USENOW3 = 1 OR USENOW3 = 2) 
+GROUP BY _EDUCAG 
+ORDER BY _EDUCAG;"
 dbGetQuery(con, sql)
 ```
 
@@ -156,13 +138,13 @@ We can get a count of smokers and total respondents per education level in one
 query by using the `IF()` function within the `COUNT()` function.
 
 ```{r}
-sql <- "SELECT X_EDUCAG AS Education, 
-        COUNT(*) AS Respondents, 
-        COUNT(IF(USENOW3 = 1 OR USENOW3 = 2, 1, NULL)) AS Smokers 
-        FROM brfss 
-        WHERE IYEAR = 2014 AND X_STATE = 53 AND X_EDUCAG <= 4 
-        GROUP BY X_EDUCAG 
-        ORDER BY X_EDUCAG;"
+sql <- "SELECT _EDUCAG AS Education, 
+COUNT(*) AS Respondents, 
+COUNT(IF(USENOW3 = 1 OR USENOW3 = 2, 1, NULL)) AS Smokers 
+FROM brfss_data 
+WHERE IYEAR = 2021 AND _STATE = 53 AND _EDUCAG <= 4 
+GROUP BY _EDUCAG 
+ORDER BY _EDUCAG;"
 rs <- dbGetQuery(con, sql)
 rs
 ```
@@ -202,24 +184,20 @@ ggplot(data=smokers, aes(x=Education, y=Smoking.Prevalence, fill=Education)) +
     geom_bar(stat="identity")
 ```
 
-```{r echo=F, results='hide'}
-dev.off()
-```
-
 ## Count Smokers by Education and Year
 
-How has smoking changed from 2011 to 2014?
+How has smoking changed from 2017 to 2021?
 
 ```{r}
-sql <- "SELECT IYEAR AS Year, X_EDUCAG AS Education, 
-        COUNT(*) AS Respondents, 
-        COUNT(IF(USENOW3 = 1 OR USENOW3 = 2, 1, NULL)) AS Smokers
-        FROM brfss 
-        WHERE (IYEAR = 2011 OR IYEAR = 2012 OR IYEAR = 2013 OR IYEAR = 2014)
-              AND X_STATE = 53 
-              AND X_EDUCAG <= 4 
-        GROUP BY IYEAR, X_EDUCAG 
-        ORDER BY IYEAR, X_EDUCAG DESC;"
+sql <- "SELECT IYEAR AS Year, _EDUCAG AS Education, 
+COUNT(*) AS Respondents, 
+COUNT(IF(USENOW3 = 1 OR USENOW3 = 2, 1, NULL)) AS Smokers
+FROM brfss_data 
+WHERE (IYEAR BETWEEN 2017 AND 2021)
+AND _STATE = 53 
+AND _EDUCAG <= 4 
+GROUP BY IYEAR, _EDUCAG 
+ORDER BY IYEAR, _EDUCAG DESC;"
 
 # The WHERE clause could also use: WHERE (IYEAR BETWEEN 2011 AND 2014)
 # The WHERE clause could also use: WHERE (IYEAR >= 2011 and IYEAR <= 2014)
@@ -239,27 +217,23 @@ ggplot(data=smokers, aes(x=Education, y=Smoking.Prevalence, fill=Year)) +
     geom_bar(stat="identity", position=position_dodge(), colour="black")
 ```
 
-```{r echo=F, results='hide'}
-dev.off()
-```
-
 ## Count Drinkers by Education Level
 
 The `DRNKANY5` variable stores a value indicating if the survey respondent has 
 consumed an alcoholic drink in the past 30 days. We will use this value to 
 indicate if the survey respondent is currently a drinker or not. A value of
-`1` means "is a drinker". Again, we will just look at Washington state in 2014.
+`1` means "is a drinker". Again, we will just look at Washington state in 2021.
 
 ```{r}
-sql <- "SELECT X_EDUCAG AS Education, 
-        COUNT(*) AS Respondents, 
-        COUNT(IF(DRNKANY5 = 1, 1, NULL)) AS Drinkers 
-        FROM brfss 
-        WHERE IYEAR = 2014
-              AND X_STATE = 53 
-              AND X_EDUCAG <= 4 
-        GROUP BY X_EDUCAG 
-        ORDER BY X_EDUCAG DESC;"
+sql <- "SELECT _EDUCAG AS Education, 
+COUNT(*) AS Respondents, 
+COUNT(IF(DRNKANY5 = 1, 1, NULL)) AS Drinkers 
+FROM brfss_data 
+WHERE IYEAR = 2021
+AND _STATE = 53 
+AND _EDUCAG <= 4 
+GROUP BY _EDUCAG 
+ORDER BY _EDUCAG DESC;"
 
 rs <- dbGetQuery(con, sql)
 ```
@@ -282,24 +256,20 @@ ggplot(data=drinkers, aes(x=Education, y=Drinking.Prevalence, fill=Education)) +
     geom_bar(stat="identity")
 ```
 
-```{r echo=F, results='hide'}
-dev.off()
-```
-
 ## Count Drinkers by Education and Year
 
-Let's see how drinking compares from 2011 to 2014.
+Let's see how drinking compares from 2017 to 2021.
 
 ```{r}
-sql <- "SELECT IYEAR AS Year, X_EDUCAG AS Education, 
-        COUNT(*) AS Respondents, 
-        COUNT(IF(DRNKANY5 = 1, 1, NULL)) AS Drinkers 
-        FROM brfss 
-        WHERE (IYEAR = 2011 OR IYEAR = 2012 OR IYEAR = 2013 OR IYEAR = 2014)
-              AND X_STATE = 53 
-              AND X_EDUCAG <= 4 
-        GROUP BY IYEAR, X_EDUCAG 
-        ORDER BY IYEAR, X_EDUCAG DESC;"
+sql <- "SELECT IYEAR AS Year, _EDUCAG AS Education, 
+COUNT(*) AS Respondents, 
+COUNT(IF(DRNKANY5 = 1, 1, NULL)) AS Drinkers 
+FROM brfss_data 
+WHERE (IYEAR BETWEEN 2011 AND 2021)
+AND _STATE = 53 
+AND _EDUCAG <= 4 
+GROUP BY IYEAR, _EDUCAG 
+ORDER BY IYEAR, _EDUCAG DESC;"
 
 rs <- dbGetQuery(con, sql)
 rs %>% group_by(Year, Education) %>% 
@@ -315,26 +285,22 @@ ggplot(data=drinkers, aes(x=Education, y=Drinking.Prevalence, fill=Year)) +
     geom_bar(stat="identity", position=position_dodge(), colour="black")
 ```
 
-```{r echo=F, results='hide'}
-dev.off()
-```
-
 ## Why so many queries?
 
 We could have retrieved all of the data for the previous plots with a single
 query:
 
 ```{r}
-sql <- "SELECT IYEAR AS Year, X_EDUCAG AS Education, 
-        COUNT(*) AS Respondents, 
-        COUNT(IF(USENOW3 = 1 OR USENOW3 = 2, 1, NULL)) AS Smokers, 
-        COUNT(IF(DRNKANY5 = 1, 1, NULL)) AS Drinkers 
-        FROM brfss 
-        WHERE (IYEAR = 2011 OR IYEAR = 2012 OR IYEAR = 2013 OR IYEAR = 2014)
-              AND X_STATE = 53 
-              AND X_EDUCAG <= 4 
-        GROUP BY IYEAR, X_EDUCAG 
-        ORDER BY IYEAR, X_EDUCAG;"
+sql <- "SELECT IYEAR AS Year, _EDUCAG AS Education, 
+COUNT(*) AS Respondents, 
+COUNT(IF(USENOW3 = 1 OR USENOW3 = 2, 1, NULL)) AS Smokers, 
+COUNT(IF(DRNKANY5 = 1, 1, NULL)) AS Drinkers 
+FROM brfss_data 
+WHERE (IYEAR BETWEEN 2017 AND 2021)
+AND _STATE = 53 
+AND _EDUCAG <= 4 
+GROUP BY IYEAR, _EDUCAG 
+ORDER BY IYEAR, _EDUCAG;"
 
 rs <- dbGetQuery(con, sql)
 rs %>% group_by(Year, Education) %>% 
@@ -374,17 +340,13 @@ ggplot(data=consumers, aes(x=Year, y=Prevalence, group=Factor, color=Factor)) +
     geom_line() + facet_grid(Factor ~ Education, scales="free_y")
 ```
 
-```{r echo=F, results='hide'}
-dev.off()
-```
-
 ## Compare other Variables
 
 Now that you know how to query the database, compare other variables, such as:
 
-- Smoking and drinking by income (`X_INCOMG`) or race (`X_RACE`)
-- Binge drinking (`X_RFBING5`) by gender (`SEX`) or age (`X_AGE80`)
-- BMI category (`X_BMI5CAT`) and exercise (`EXERANY2`) or sleep (`SLEPTIM1`)
+- Smoking and drinking by income (`_INCOMG`) or race (`_RACE`)
+- Binge drinking (`_RFBING5`) by gender (`SEX`) or age (`_AGE80`)
+- BMI category (`_BMI5CAT`) and exercise (`EXERANY2`) or sleep (`SLEPTIM1`)
 - Health care access (`HLTHPLN1`) and household income (`INCOME2`)
 - Stress (`QLSTRES2`) and marital status (`MARITAL`)
 - Internet use (`INTERNET`) and mental health (`MENTHLTH`) 
@@ -393,39 +355,36 @@ Now that you know how to query the database, compare other variables, such as:
 
 ## Speeding up Queries
 
-If we retrieve all of the data for Washington state respondents in 2011-2014,
+If we retrieve all of the data for Washington state respondents in 2017-2021,
 we can just use R commands for subsetting and work entirely from memory.
 
 ```{r message=FALSE}
-# Get a subset of the dataset for 2011-2014 and state of Washington
-sql <- "SELECT * FROM brfss 
-        WHERE (IYEAR = 2011 OR IYEAR = 2012 OR IYEAR = 2013 OR IYEAR = 2014) 
-            AND X_STATE = 53;"
+# Get a subset of the dataset for 2017-2021 and state of Washington
+sql <- "SELECT * FROM brfss_data 
+WHERE (IYEAR BETWEEN 2017 AND 2021) 
+AND _STATE = 53;"
 
 # Use a data.table instead of a data.frame for improved performance
 library(data.table)
-brfsswa1114 <- as.data.table(dbGetQuery(con, sql))
-
-# You can also save this data.table as a SQL table in the MySQL database
-#dbWriteTable(con, name = "brfsswa1114", brfsswa1114, row.names=F)
+brfsswa1721 <- as.data.table(dbGetQuery(con, sql))
 
 # Remove columns that contain only NA , zero (0), or the empty string ('')
-brfsswa1114 <- brfsswa1114[, which(unlist(lapply(
-    brfsswa1114, function(x) ! all(is.na(x) | x==0 | x=='')))), with=F]
+brfsswa1721 <- brfsswa1721[, which(unlist(lapply(
+    brfsswa1721, function(x) ! all(is.na(x) | x==0 | x=='')))), with=FALSE]
 ```
 
 ## Check on Memory, Write to File
 
 ```{r}
 # Report data table size and dimensions
-cat("The data table consumes", object.size(brfsswa1114) / 1024^2, "MB", 
-    "with", dim(brfsswa1114)[1], "observations and", 
-    dim(brfsswa1114)[2], "variables", "\n")
+cat("The data table consumes", object.size(brfsswa1721) / 1024^2, "MB", 
+    "with", dim(brfsswa1721)[1], "observations and", 
+    dim(brfsswa1721)[2], "variables", "\n")
 
-# Save as a CSV and check on the size
-filename <- "brfsswa1114.csv"
-if (! file.exists(filename)) write.csv(brfsswa1114, filename, row.names=FALSE)
-cat(paste(c("Size of CSV file is", 
+# Save as a RDS and check on the size
+filename <- "brfsswa1721.rds"
+if (! file.exists(filename)) saveRDS(brfsswa1721, filename)
+cat(paste(c("Size of RDS file is", 
             round(file.size(filename) / 1024^2, 1), "MB", "\n")))
 ```
 
@@ -435,14 +394,14 @@ We can test our `data.table` by reproducing our SQL query with R commands.
 
 ```{r message=FALSE}
 # Rename columns to match our SQL results
-setnames(brfsswa1114, "IYEAR", "Year")
-setnames(brfsswa1114, "X_EDUCAG", "Education")
+setnames(brfsswa1721, "IYEAR", "Year")
+setnames(brfsswa1721, "_EDUCAG", "Education")
 
 # Use order() to set sort order like in SQL
-brfsswa1114 <- brfsswa1114[order(Year, Education)]
+brfsswa1721 <- brfsswa1721[order(Year, Education)]
 
 # Use DT[i, j, by=...] syntax to query and aggregate like in SQL
-consumers <- brfsswa1114[Education <= 4, list(
+consumers <- brfsswa1721[Education <= 4, list(
     Smoking = sum(USENOW3 == 1 | USENOW3 == 2, na.rm = TRUE)/.N,
     Drinking = sum(DRNKANY5 == 1, na.rm = TRUE)/.N), 
     by = list(Year, Education)]
@@ -458,7 +417,7 @@ consumers$Year <- factor(consumers$Year)
 ## Check Results
 
 ```{r}
-consumers
+consumers %>% data.frame()
 ```
 
 ## Convert to Long Format
@@ -478,15 +437,11 @@ ggplot(data=consumers, aes(x=Year, y=Prevalence, group=Factor, color=Factor)) +
     geom_line() + facet_grid(Factor ~ Education, scales="free_y")
 ```
 
-```{r echo=F, results='hide'}
-dev.off()
-```
-
 ## Close Database Connection
 
 Once we are done with the database, we can close the connection to it.
 
 ```{r}
 # Close connection
-dbDisconnect(con)
+dbDisconnect(con, shutdown = TRUE)
 ```

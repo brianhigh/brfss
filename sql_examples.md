@@ -1,27 +1,38 @@
-# Smoking and Drinking
-Brian High  
-![CC BY-SA 4.0](cc_by-sa_4.png)  
-
+---
+title: "Smoking and Drinking"
+author: "Brian High"
+date: "![CC BY-SA 4.0](cc_by-sa_4.png)"
+output: 
+  ioslides_presentation:
+    fig_caption: yes
+    fig_retina: 1
+    fig_width: 7
+    fig_height: 4
+    keep_md: yes
+    smaller: yes
+fig_width: 8.5
+fig_height: 3.5
+keep_md: yes
+smaller: yes
+logo: logo_128.png
+---
+  
 ## SQL Examples: Smoking and Drinking
-
+  
 This is a demo of some basic SQL `SELECT` queries using BRFSS data from: 
 http://www.cdc.gov/brfss/. 
 
-We have downloaded the data for each respondent for the years 2005 through 2014.
+We have downloaded the data for each respondent for the years 2017 through 2021.
 
-This dataset has 4,379,516 rows and 999 columns.
+This dataset has 2,146,371 rows and 358 columns.
 
 This dataset will be too large to fit in RAM memory for most desktop and laptop 
 computers.
 
-When exported as a TSV file, this file is 13 GB. When loaded into R as a data 
-table, the memory consumed is almost 33 GB.
-
-Instead, we have imported the data into a MySQL database table. We have indexed
-the table on survey year and state to improve performance.
+Instead, we have [exported](download_brfss_into_duckdb.R) the data into a DuckDB database file.
 
 The CDC has provided a 
-[codebook](http://www.cdc.gov/brfss/annual_data/2014/pdf/codebook14_llcp.pdf) 
+[codebook](https://www.cdc.gov/brfss/annual_data/2021/pdf/codebook21_llcp-v2-508.pdf) 
 for use in understanding variables and codes.
 
 In particular, we will focus on tobacco use and alcohol consumption in 
@@ -33,14 +44,9 @@ Load the required R packages, installing as necessary.
 
 
 ```r
-for (pkg in c("knitr", "RMySQL", "dplyr", "ggplot2", "tidyr", "data.table")) {
-    if (! suppressWarnings(require(pkg, character.only=TRUE)) ) {
-        install.packages(pkg, repos="http://cran.fhcrc.org", dependencies=TRUE)
-        if (! suppressWarnings(require(pkg, character.only=TRUE)) ) {
-            stop(paste0(c("Can't load package: ", pkg, "!"), collapse = ""))
-        }
-    }
-}
+# Attach packages, installing as needed
+if(!requireNamespace("pacman", quietly = TRUE)) install.packages("pacman")
+pacman::p_load(knitr, dplyr, ggplot2, tidyr, data.table, duckdb)
 ```
 
 Set `knitr` rendering options and the default number of digits for printing.
@@ -51,123 +57,100 @@ opts_chunk$set(tidy=FALSE, cache=TRUE)
 options(digits=4)
 ```
 
-## Connect to MySQL Database
+## Connect to DuckDB Database
 
-We will connect to the `localhost` and `brfss` database using an `anonymous` 
-account.
-
-
-```r
-library(RMySQL)
-
-con <- dbConnect(MySQL(), 
-                 host="localhost", 
-                 username="anonymous", 
-                 password="Ank7greph-", 
-                 dbname="brfss")
-```
-
-It's generally a *bad* idea to put your connection credentials in your script,
-and an even *worse* idea to publish these on Github. *Don't be like me!*
+Connect to the DuckDB database file.
 
 
 ```r
-if (file.exists("con.R")) source("con.R")
+ddb_fn <- "brfss_data.duckdb"
+con <- duckdb::dbConnect(duckdb(), ddb_fn)
 ```
-
-A lesser evil is to put them in a separate file that you keep secure and private.
-
-Even better would be to configure your system to prompt you for the password.
 
 ## Table Size
 
-Print the number of rows and columns, as well as table and index size.
+Print the number of rows and columns, as well as number of indexes.
 
 
 ```r
-sql <- "SELECT COUNT(*) AS rows FROM brfss;"
+sql <- "SELECT COUNT(*) AS rows FROM brfss_data;"
 rs <- dbGetQuery(con, sql)
 cat(rs$rows, "rows")
 ```
 
 ```
-## 4379516 rows
+## 2146371 rows
 ```
 
 ```r
-sql <- "SELECT * FROM brfss LIMIT 1;"
+sql <- "SELECT * FROM brfss_data LIMIT 1;"
 rs <- dbGetQuery(con, sql)
 cat(ncol(rs), "columns")
 ```
 
 ```
-## 999 columns
+## 358 columns
 ```
 
 ```r
-sql <- "SHOW TABLE STATUS IN brfss;"
+sql <- "select * from duckdb_indexes;"
 rs <- dbGetQuery(con, sql)
-cat(sum(rs[1, c("Data_length", "Index_length")]) / (1024^3), "GB")
+cat(nrow(rs), "indexes")
 ```
 
 ```
-## 4.283 GB
+## 0 indexes
 ```
 
 ## Count Respondents by Year
 
 Let's count (`COUNT`) the number of respondents per year (`GROUP BY`) in 
-Washington state (`X_STATE = 53`), sorting by year (`ORDER BY`).
+Washington state (`_STATE = 53`), sorting by year (`ORDER BY`).
 
 
 ```r
 sql <- "SELECT IYEAR AS Year, COUNT(*) AS Respondents 
-        FROM brfss 
-        WHERE X_STATE = 53 
+        FROM brfss_data 
+        WHERE _STATE = 53 
         GROUP BY IYEAR 
         ORDER BY IYEAR;"
 dbGetQuery(con, sql)
 ```
 
 ```
-##    Year Respondents
-## 1  2005       23302
-## 2  2006       23760
-## 3  2007       25881
-## 4  2008       22532
-## 5  2009       20294
-## 6  2010       19628
-## 7  2011       14772
-## 8  2012       15319
-## 9  2013       11158
-## 10 2014       10086
-## 11 2015          10
+##   Year Respondents
+## 1 2017       13272
+## 2 2018       13106
+## 3 2019       12987
+## 4 2020       12673
+## 5 2021       12830
+## 6 2022         568
 ```
 
 ## Respondents per Education Level
 
-Look at the number of respondents in 2014 and aggregate by education level.
+Look at the number of respondents in 2021 and aggregate by education level.
 
 
 ```r
-sql <- "SELECT X_EDUCAG AS Education, COUNT(*) AS Respondents 
-        FROM brfss 
-        WHERE IYEAR = 2014 AND X_STATE = 53 
-        GROUP BY X_EDUCAG 
-        ORDER BY X_EDUCAG;"
+sql <- "SELECT _EDUCAG AS Education, COUNT(*) AS Respondents 
+        FROM brfss_data 
+        WHERE IYEAR = 2021 AND _STATE = 53 
+        GROUP BY _EDUCAG 
+        ORDER BY _EDUCAG;"
 dbGetQuery(con, sql)
 ```
 
 ```
 ##   Education Respondents
-## 1         1         496
-## 2         2        2153
-## 3         3        3023
-## 4         4        4353
-## 5         9          61
+## 1         1         618
+## 2         2        2543
+## 3         3        3693
+## 4         4        5884
+## 5         9          92
 ```
 
-The education level (`X_EDUCAG`) is an integer from 1-4 (or 9 meaning 
+The education level (`_EDUCAG`) is an integer from 1-4 (or 9 meaning 
 "Don't know", "Missing", etc.). Do we see a trend? Is our sample skewed?
 
 ## Count Smokers by Education Level
@@ -178,22 +161,22 @@ a smoker or not. A value of `1` (Every day) or `2` (Some days) means
 
 
 ```r
-sql <- "SELECT X_EDUCAG AS Education, 
-        COUNT(USENOW3) AS Smokers 
-        FROM brfss 
-        WHERE IYEAR = 2014 AND X_STATE = 53 AND X_EDUCAG <= 4 
-              AND (USENOW3 = 1 OR USENOW3 = 2) 
-        GROUP BY X_EDUCAG 
-        ORDER BY X_EDUCAG;"
+sql <- "SELECT _EDUCAG AS Education, 
+COUNT(USENOW3) AS Smokers 
+FROM brfss_data 
+WHERE IYEAR = 2021 AND _STATE = 53 AND _EDUCAG <= 4 
+AND (USENOW3 = 1 OR USENOW3 = 2) 
+GROUP BY _EDUCAG 
+ORDER BY _EDUCAG;"
 dbGetQuery(con, sql)
 ```
 
 ```
 ##   Education Smokers
-## 1         1      16
-## 2         2      83
-## 3         3      74
-## 4         4      57
+## 1         1      28
+## 2         2      96
+## 3         3      83
+## 4         4      87
 ```
 
 The number of respondents varies by education level, so we will 
@@ -206,23 +189,23 @@ query by using the `IF()` function within the `COUNT()` function.
 
 
 ```r
-sql <- "SELECT X_EDUCAG AS Education, 
-        COUNT(*) AS Respondents, 
-        COUNT(IF(USENOW3 = 1 OR USENOW3 = 2, 1, NULL)) AS Smokers 
-        FROM brfss 
-        WHERE IYEAR = 2014 AND X_STATE = 53 AND X_EDUCAG <= 4 
-        GROUP BY X_EDUCAG 
-        ORDER BY X_EDUCAG;"
+sql <- "SELECT _EDUCAG AS Education, 
+COUNT(*) AS Respondents, 
+COUNT(IF(USENOW3 = 1 OR USENOW3 = 2, 1, NULL)) AS Smokers 
+FROM brfss_data 
+WHERE IYEAR = 2021 AND _STATE = 53 AND _EDUCAG <= 4 
+GROUP BY _EDUCAG 
+ORDER BY _EDUCAG;"
 rs <- dbGetQuery(con, sql)
 rs
 ```
 
 ```
 ##   Education Respondents Smokers
-## 1         1         496      16
-## 2         2        2153      83
-## 3         3        3023      74
-## 4         4        4353      57
+## 1         1         618      28
+## 2         2        2543      96
+## 3         3        3693      83
+## 4         4        5884      87
 ```
 
 The `IF()` condition `USENOW3 = 1 OR USENOW3 = 2` was taken from the `WHERE` 
@@ -242,15 +225,14 @@ smokers
 ```
 
 ```
-## Source: local data frame [4 x 4]
-## Groups: Education [4]
-## 
+## # A tibble: 4 × 4
+## # Groups:   Education [4]
 ##   Education Respondents Smokers Smoking.Prevalence
-##       (int)       (dbl)   (dbl)              (dbl)
-## 1         1         496      16            0.03226
-## 2         2        2153      83            0.03855
-## 3         3        3023      74            0.02448
-## 4         4        4353      57            0.01309
+##       <dbl>       <dbl>   <dbl>              <dbl>
+## 1         1         618      28             0.0453
+## 2         2        2543      96             0.0378
+## 3         3        3693      83             0.0225
+## 4         4        5884      87             0.0148
 ```
 
 ## Relabel Education Level
@@ -267,15 +249,14 @@ smokers
 ```
 
 ```
-## Source: local data frame [4 x 4]
-## Groups: Education [4]
-## 
-##          Education Respondents Smokers Smoking.Prevalence
-##             (fctr)       (dbl)   (dbl)              (dbl)
-## 1      some school         496      16            0.03226
-## 2 high school grad        2153      83            0.03855
-## 3     some college        3023      74            0.02448
-## 4     college grad        4353      57            0.01309
+## # A tibble: 4 × 4
+## # Groups:   Education [4]
+##   Education        Respondents Smokers Smoking.Prevalence
+##   <fct>                  <dbl>   <dbl>              <dbl>
+## 1 some school              618      28             0.0453
+## 2 high school grad        2543      96             0.0378
+## 3 some college            3693      83             0.0225
+## 4 college grad            5884      87             0.0148
 ```
 
 ## Smoking Prevalence by Education Level
@@ -287,25 +268,23 @@ ggplot(data=smokers, aes(x=Education, y=Smoking.Prevalence, fill=Education)) +
     geom_bar(stat="identity")
 ```
 
-![](sql_examples_files/figure-html/unnamed-chunk-11-1.png)\
-
-
+![](sql_examples_files/figure-html/unnamed-chunk-10-1.png)<!-- -->
 
 ## Count Smokers by Education and Year
 
-How has smoking changed from 2011 to 2014?
+How has smoking changed from 2017 to 2021?
 
 
 ```r
-sql <- "SELECT IYEAR AS Year, X_EDUCAG AS Education, 
-        COUNT(*) AS Respondents, 
-        COUNT(IF(USENOW3 = 1 OR USENOW3 = 2, 1, NULL)) AS Smokers
-        FROM brfss 
-        WHERE (IYEAR = 2011 OR IYEAR = 2012 OR IYEAR = 2013 OR IYEAR = 2014)
-              AND X_STATE = 53 
-              AND X_EDUCAG <= 4 
-        GROUP BY IYEAR, X_EDUCAG 
-        ORDER BY IYEAR, X_EDUCAG DESC;"
+sql <- "SELECT IYEAR AS Year, _EDUCAG AS Education, 
+COUNT(*) AS Respondents, 
+COUNT(IF(USENOW3 = 1 OR USENOW3 = 2, 1, NULL)) AS Smokers
+FROM brfss_data 
+WHERE (IYEAR BETWEEN 2017 AND 2021)
+AND _STATE = 53 
+AND _EDUCAG <= 4 
+GROUP BY IYEAR, _EDUCAG 
+ORDER BY IYEAR, _EDUCAG DESC;"
 
 # The WHERE clause could also use: WHERE (IYEAR BETWEEN 2011 AND 2014)
 # The WHERE clause could also use: WHERE (IYEAR >= 2011 and IYEAR <= 2014)
@@ -326,28 +305,26 @@ ggplot(data=smokers, aes(x=Education, y=Smoking.Prevalence, fill=Year)) +
     geom_bar(stat="identity", position=position_dodge(), colour="black")
 ```
 
-![](sql_examples_files/figure-html/unnamed-chunk-14-1.png)\
-
-
+![](sql_examples_files/figure-html/unnamed-chunk-12-1.png)<!-- -->
 
 ## Count Drinkers by Education Level
 
 The `DRNKANY5` variable stores a value indicating if the survey respondent has 
 consumed an alcoholic drink in the past 30 days. We will use this value to 
 indicate if the survey respondent is currently a drinker or not. A value of
-`1` means "is a drinker". Again, we will just look at Washington state in 2014.
+`1` means "is a drinker". Again, we will just look at Washington state in 2021.
 
 
 ```r
-sql <- "SELECT X_EDUCAG AS Education, 
-        COUNT(*) AS Respondents, 
-        COUNT(IF(DRNKANY5 = 1, 1, NULL)) AS Drinkers 
-        FROM brfss 
-        WHERE IYEAR = 2014
-              AND X_STATE = 53 
-              AND X_EDUCAG <= 4 
-        GROUP BY X_EDUCAG 
-        ORDER BY X_EDUCAG DESC;"
+sql <- "SELECT _EDUCAG AS Education, 
+COUNT(*) AS Respondents, 
+COUNT(IF(DRNKANY5 = 1, 1, NULL)) AS Drinkers 
+FROM brfss_data 
+WHERE IYEAR = 2021
+AND _STATE = 53 
+AND _EDUCAG <= 4 
+GROUP BY _EDUCAG 
+ORDER BY _EDUCAG DESC;"
 
 rs <- dbGetQuery(con, sql)
 ```
@@ -365,15 +342,14 @@ drinkers
 ```
 
 ```
-## Source: local data frame [4 x 4]
-## Groups: Education [4]
-## 
-##          Education Respondents Drinkers Drinking.Prevalence
-##             (fctr)       (dbl)    (dbl)               (dbl)
-## 1     college grad        4353     2947              0.6770
-## 2     some college        3023     1646              0.5445
-## 3 high school grad        2153     1058              0.4914
-## 4      some school         496      162              0.3266
+## # A tibble: 4 × 4
+## # Groups:   Education [4]
+##   Education        Respondents Drinkers Drinking.Prevalence
+##   <fct>                  <dbl>    <dbl>               <dbl>
+## 1 college grad            5884     3682               0.626
+## 2 some college            3693     1849               0.501
+## 3 high school grad        2543     1118               0.440
+## 4 some school              618      181               0.293
 ```
 
 ## Drinking Prevalence by Education Level
@@ -384,25 +360,23 @@ ggplot(data=drinkers, aes(x=Education, y=Drinking.Prevalence, fill=Education)) +
     geom_bar(stat="identity")
 ```
 
-![](sql_examples_files/figure-html/unnamed-chunk-18-1.png)\
-
-
+![](sql_examples_files/figure-html/unnamed-chunk-15-1.png)<!-- -->
 
 ## Count Drinkers by Education and Year
 
-Let's see how drinking compares from 2011 to 2014.
+Let's see how drinking compares from 2017 to 2021.
 
 
 ```r
-sql <- "SELECT IYEAR AS Year, X_EDUCAG AS Education, 
-        COUNT(*) AS Respondents, 
-        COUNT(IF(DRNKANY5 = 1, 1, NULL)) AS Drinkers 
-        FROM brfss 
-        WHERE (IYEAR = 2011 OR IYEAR = 2012 OR IYEAR = 2013 OR IYEAR = 2014)
-              AND X_STATE = 53 
-              AND X_EDUCAG <= 4 
-        GROUP BY IYEAR, X_EDUCAG 
-        ORDER BY IYEAR, X_EDUCAG DESC;"
+sql <- "SELECT IYEAR AS Year, _EDUCAG AS Education, 
+COUNT(*) AS Respondents, 
+COUNT(IF(DRNKANY5 = 1, 1, NULL)) AS Drinkers 
+FROM brfss_data 
+WHERE (IYEAR BETWEEN 2011 AND 2021)
+AND _STATE = 53 
+AND _EDUCAG <= 4 
+GROUP BY IYEAR, _EDUCAG 
+ORDER BY IYEAR, _EDUCAG DESC;"
 
 rs <- dbGetQuery(con, sql)
 rs %>% group_by(Year, Education) %>% 
@@ -419,9 +393,7 @@ ggplot(data=drinkers, aes(x=Education, y=Drinking.Prevalence, fill=Year)) +
     geom_bar(stat="identity", position=position_dodge(), colour="black")
 ```
 
-![](sql_examples_files/figure-html/unnamed-chunk-21-1.png)\
-
-
+![](sql_examples_files/figure-html/unnamed-chunk-17-1.png)<!-- -->
 
 ## Why so many queries?
 
@@ -430,16 +402,16 @@ query:
 
 
 ```r
-sql <- "SELECT IYEAR AS Year, X_EDUCAG AS Education, 
-        COUNT(*) AS Respondents, 
-        COUNT(IF(USENOW3 = 1 OR USENOW3 = 2, 1, NULL)) AS Smokers, 
-        COUNT(IF(DRNKANY5 = 1, 1, NULL)) AS Drinkers 
-        FROM brfss 
-        WHERE (IYEAR = 2011 OR IYEAR = 2012 OR IYEAR = 2013 OR IYEAR = 2014)
-              AND X_STATE = 53 
-              AND X_EDUCAG <= 4 
-        GROUP BY IYEAR, X_EDUCAG 
-        ORDER BY IYEAR, X_EDUCAG;"
+sql <- "SELECT IYEAR AS Year, _EDUCAG AS Education, 
+COUNT(*) AS Respondents, 
+COUNT(IF(USENOW3 = 1 OR USENOW3 = 2, 1, NULL)) AS Smokers, 
+COUNT(IF(DRNKANY5 = 1, 1, NULL)) AS Drinkers 
+FROM brfss_data 
+WHERE (IYEAR BETWEEN 2017 AND 2021)
+AND _STATE = 53 
+AND _EDUCAG <= 4 
+GROUP BY IYEAR, _EDUCAG 
+ORDER BY IYEAR, _EDUCAG;"
 
 rs <- dbGetQuery(con, sql)
 rs %>% group_by(Year, Education) %>% 
@@ -460,27 +432,30 @@ consumers
 ```
 
 ```
-## Source: local data frame [16 x 7]
-## Groups: Year, Education [16]
-## 
-##      Year        Education Respondents Smokers Drinkers Smoking Drinking
-##    (fctr)           (fctr)       (dbl)   (dbl)    (dbl)   (dbl)    (dbl)
-## 1    2011      some school         893      32      309 0.03583   0.3460
-## 2    2011 high school grad        3491     127     1654 0.03638   0.4738
-## 3    2011     some college        4670     113     2553 0.02420   0.5467
-## 4    2011     college grad        5668      77     3817 0.01359   0.6734
-## 5    2012      some school         856      28      291 0.03271   0.3400
-## 6    2012 high school grad        3512     145     1700 0.04129   0.4841
-## 7    2012     some college        4635     116     2650 0.02503   0.5717
-## 8    2012     college grad        6280      99     4330 0.01576   0.6895
-## 9    2013      some school         581      22      196 0.03787   0.3373
-## 10   2013 high school grad        2578     114     1242 0.04422   0.4818
-## 11   2013     some college        3426      85     1885 0.02481   0.5502
-## 12   2013     college grad        4546      62     3090 0.01364   0.6797
-## 13   2014      some school         496      16      162 0.03226   0.3266
-## 14   2014 high school grad        2153      83     1058 0.03855   0.4914
-## 15   2014     some college        3023      74     1646 0.02448   0.5445
-## 16   2014     college grad        4353      57     2947 0.01309   0.6770
+## # A tibble: 20 × 7
+## # Groups:   Year, Education [20]
+##    Year  Education        Respondents Smokers Drinkers Smoking Drinking
+##    <fct> <fct>                  <dbl>   <dbl>    <dbl>   <dbl>    <dbl>
+##  1 2017  some school              756      32      269  0.0423    0.356
+##  2 2017  high school grad        2906     116     1308  0.0399    0.450
+##  3 2017  some college            3856     115     2036  0.0298    0.528
+##  4 2017  college grad            5693      93     3695  0.0163    0.649
+##  5 2018  some school              757      18      231  0.0238    0.305
+##  6 2018  high school grad        2876     130     1221  0.0452    0.425
+##  7 2018  some college            4012      99     2074  0.0247    0.517
+##  8 2018  college grad            5394      72     3402  0.0133    0.631
+##  9 2019  some school              749      27      222  0.0360    0.296
+## 10 2019  high school grad        2816     119     1219  0.0423    0.433
+## 11 2019  some college            3910     112     1923  0.0286    0.492
+## 12 2019  college grad            5445      82     3401  0.0151    0.625
+## 13 2020  some school              691      17      228  0.0246    0.330
+## 14 2020  high school grad        2809     105     1256  0.0374    0.447
+## 15 2020  some college            3800     105     1961  0.0276    0.516
+## 16 2020  college grad            5310      66     3232  0.0124    0.609
+## 17 2021  some school              618      28      181  0.0453    0.293
+## 18 2021  high school grad        2543      96     1118  0.0378    0.440
+## 19 2021  some college            3693      83     1849  0.0225    0.501
+## 20 2021  college grad            5884      87     3682  0.0148    0.626
 ```
 
 ## Smoking and Drinking in Long Format
@@ -499,18 +474,18 @@ head(consumers, 8)
 ```
 
 ```
-## Source: local data frame [8 x 4]
-## 
-##     Year        Education  Factor Prevalence
-##   (fctr)           (fctr)  (fctr)      (dbl)
-## 1   2011      some school Smoking    0.03583
-## 2   2011 high school grad Smoking    0.03638
-## 3   2011     some college Smoking    0.02420
-## 4   2011     college grad Smoking    0.01359
-## 5   2012      some school Smoking    0.03271
-## 6   2012 high school grad Smoking    0.04129
-## 7   2012     some college Smoking    0.02503
-## 8   2012     college grad Smoking    0.01576
+## # A tibble: 8 × 4
+## # Groups:   Year, Education [8]
+##   Year  Education        Factor  Prevalence
+##   <fct> <fct>            <chr>        <dbl>
+## 1 2017  some school      Smoking     0.0423
+## 2 2017  high school grad Smoking     0.0399
+## 3 2017  some college     Smoking     0.0298
+## 4 2017  college grad     Smoking     0.0163
+## 5 2018  some school      Smoking     0.0238
+## 6 2018  high school grad Smoking     0.0452
+## 7 2018  some college     Smoking     0.0247
+## 8 2018  college grad     Smoking     0.0133
 ```
 
 ## Smoking and Drinking Prevalence
@@ -521,17 +496,15 @@ ggplot(data=consumers, aes(x=Year, y=Prevalence, group=Factor, color=Factor)) +
     geom_line() + facet_grid(Factor ~ Education, scales="free_y")
 ```
 
-![](sql_examples_files/figure-html/unnamed-chunk-26-1.png)\
-
-
+![](sql_examples_files/figure-html/unnamed-chunk-21-1.png)<!-- -->
 
 ## Compare other Variables
 
 Now that you know how to query the database, compare other variables, such as:
 
-- Smoking and drinking by income (`X_INCOMG`) or race (`X_RACE`)
-- Binge drinking (`X_RFBING5`) by gender (`SEX`) or age (`X_AGE80`)
-- BMI category (`X_BMI5CAT`) and exercise (`EXERANY2`) or sleep (`SLEPTIM1`)
+- Smoking and drinking by income (`_INCOMG`) or race (`_RACE`)
+- Binge drinking (`_RFBING5`) by gender (`SEX`) or age (`_AGE80`)
+- BMI category (`_BMI5CAT`) and exercise (`EXERANY2`) or sleep (`SLEPTIM1`)
 - Health care access (`HLTHPLN1`) and household income (`INCOME2`)
 - Stress (`QLSTRES2`) and marital status (`MARITAL`)
 - Internet use (`INTERNET`) and mental health (`MENTHLTH`) 
@@ -540,26 +513,23 @@ Now that you know how to query the database, compare other variables, such as:
 
 ## Speeding up Queries
 
-If we retrieve all of the data for Washington state respondents in 2011-2014,
+If we retrieve all of the data for Washington state respondents in 2017-2021,
 we can just use R commands for subsetting and work entirely from memory.
 
 
 ```r
-# Get a subset of the dataset for 2011-2014 and state of Washington
-sql <- "SELECT * FROM brfss 
-        WHERE (IYEAR = 2011 OR IYEAR = 2012 OR IYEAR = 2013 OR IYEAR = 2014) 
-            AND X_STATE = 53;"
+# Get a subset of the dataset for 2017-2021 and state of Washington
+sql <- "SELECT * FROM brfss_data 
+WHERE (IYEAR BETWEEN 2017 AND 2021) 
+AND _STATE = 53;"
 
 # Use a data.table instead of a data.frame for improved performance
 library(data.table)
-brfsswa1114 <- as.data.table(dbGetQuery(con, sql))
-
-# You can also save this data.table as a SQL table in the MySQL database
-#dbWriteTable(con, name = "brfsswa1114", brfsswa1114, row.names=F)
+brfsswa1721 <- as.data.table(dbGetQuery(con, sql))
 
 # Remove columns that contain only NA , zero (0), or the empty string ('')
-brfsswa1114 <- brfsswa1114[, which(unlist(lapply(
-    brfsswa1114, function(x) ! all(is.na(x) | x==0 | x=='')))), with=F]
+brfsswa1721 <- brfsswa1721[, which(unlist(lapply(
+    brfsswa1721, function(x) ! all(is.na(x) | x==0 | x=='')))), with=FALSE]
 ```
 
 ## Check on Memory, Write to File
@@ -567,25 +537,25 @@ brfsswa1114 <- brfsswa1114[, which(unlist(lapply(
 
 ```r
 # Report data table size and dimensions
-cat("The data table consumes", object.size(brfsswa1114) / 1024^2, "MB", 
-    "with", dim(brfsswa1114)[1], "observations and", 
-    dim(brfsswa1114)[2], "variables", "\n")
+cat("The data table consumes", object.size(brfsswa1721) / 1024^2, "MB", 
+    "with", dim(brfsswa1721)[1], "observations and", 
+    dim(brfsswa1721)[2], "variables", "\n")
 ```
 
 ```
-## The data table consumes 82.59 MB with 51335 observations and 417 variables
+## The data table consumes 125.9 MB with 64868 observations and 246 variables
 ```
 
 ```r
-# Save as a CSV and check on the size
-filename <- "brfsswa1114.csv"
-if (! file.exists(filename)) write.csv(brfsswa1114, filename, row.names=FALSE)
-cat(paste(c("Size of CSV file is", 
+# Save as a RDS and check on the size
+filename <- "brfsswa1721.rds"
+if (! file.exists(filename)) saveRDS(brfsswa1721, filename)
+cat(paste(c("Size of RDS file is", 
             round(file.size(filename) / 1024^2, 1), "MB", "\n")))
 ```
 
 ```
-## Size of CSV file is 57.5 MB
+## Size of RDS file is 5.3 MB
 ```
 
 ## Query, Aggregate and Factor
@@ -595,14 +565,14 @@ We can test our `data.table` by reproducing our SQL query with R commands.
 
 ```r
 # Rename columns to match our SQL results
-setnames(brfsswa1114, "IYEAR", "Year")
-setnames(brfsswa1114, "X_EDUCAG", "Education")
+setnames(brfsswa1721, "IYEAR", "Year")
+setnames(brfsswa1721, "_EDUCAG", "Education")
 
 # Use order() to set sort order like in SQL
-brfsswa1114 <- brfsswa1114[order(Year, Education)]
+brfsswa1721 <- brfsswa1721[order(Year, Education)]
 
 # Use DT[i, j, by=...] syntax to query and aggregate like in SQL
-consumers <- brfsswa1114[Education <= 4, list(
+consumers <- brfsswa1721[Education <= 4, list(
     Smoking = sum(USENOW3 == 1 | USENOW3 == 2, na.rm = TRUE)/.N,
     Drinking = sum(DRNKANY5 == 1, na.rm = TRUE)/.N), 
     by = list(Year, Education)]
@@ -619,27 +589,31 @@ consumers$Year <- factor(consumers$Year)
 
 
 ```r
-consumers
+consumers %>% data.frame()
 ```
 
 ```
-##     Year        Education Smoking Drinking
-##  1: 2011      some school 0.03583   0.3460
-##  2: 2011 high school grad 0.03638   0.4738
-##  3: 2011     some college 0.02420   0.5467
-##  4: 2011     college grad 0.01359   0.6734
-##  5: 2012      some school 0.03271   0.3400
-##  6: 2012 high school grad 0.04129   0.4841
-##  7: 2012     some college 0.02503   0.5717
-##  8: 2012     college grad 0.01576   0.6895
-##  9: 2013      some school 0.03787   0.3373
-## 10: 2013 high school grad 0.04422   0.4818
-## 11: 2013     some college 0.02481   0.5502
-## 12: 2013     college grad 0.01364   0.6797
-## 13: 2014      some school 0.03226   0.3266
-## 14: 2014 high school grad 0.03855   0.4914
-## 15: 2014     some college 0.02448   0.5445
-## 16: 2014     college grad 0.01309   0.6770
+##    Year        Education Smoking Drinking
+## 1  2017      some school 0.04233   0.3558
+## 2  2017 high school grad 0.03992   0.4501
+## 3  2017     some college 0.02982   0.5280
+## 4  2017     college grad 0.01634   0.6490
+## 5  2018      some school 0.02378   0.3052
+## 6  2018 high school grad 0.04520   0.4245
+## 7  2018     some college 0.02468   0.5169
+## 8  2018     college grad 0.01335   0.6307
+## 9  2019      some school 0.03605   0.2964
+## 10 2019 high school grad 0.04226   0.4329
+## 11 2019     some college 0.02864   0.4918
+## 12 2019     college grad 0.01506   0.6246
+## 13 2020      some school 0.02460   0.3300
+## 14 2020 high school grad 0.03738   0.4471
+## 15 2020     some college 0.02763   0.5161
+## 16 2020     college grad 0.01243   0.6087
+## 17 2021      some school 0.04531   0.2929
+## 18 2021 high school grad 0.03775   0.4396
+## 19 2021     some college 0.02247   0.5007
+## 20 2021     college grad 0.01479   0.6258
 ```
 
 ## Convert to Long Format
@@ -654,22 +628,22 @@ consumers %>% head(16)
 
 ```
 ##    Year        Education  Factor Prevalence
-## 1  2011      some school Smoking    0.03583
-## 2  2011 high school grad Smoking    0.03638
-## 3  2011     some college Smoking    0.02420
-## 4  2011     college grad Smoking    0.01359
-## 5  2012      some school Smoking    0.03271
-## 6  2012 high school grad Smoking    0.04129
-## 7  2012     some college Smoking    0.02503
-## 8  2012     college grad Smoking    0.01576
-## 9  2013      some school Smoking    0.03787
-## 10 2013 high school grad Smoking    0.04422
-## 11 2013     some college Smoking    0.02481
-## 12 2013     college grad Smoking    0.01364
-## 13 2014      some school Smoking    0.03226
-## 14 2014 high school grad Smoking    0.03855
-## 15 2014     some college Smoking    0.02448
-## 16 2014     college grad Smoking    0.01309
+## 1  2017      some school Smoking    0.04233
+## 2  2017 high school grad Smoking    0.03992
+## 3  2017     some college Smoking    0.02982
+## 4  2017     college grad Smoking    0.01634
+## 5  2018      some school Smoking    0.02378
+## 6  2018 high school grad Smoking    0.04520
+## 7  2018     some college Smoking    0.02468
+## 8  2018     college grad Smoking    0.01335
+## 9  2019      some school Smoking    0.03605
+## 10 2019 high school grad Smoking    0.04226
+## 11 2019     some college Smoking    0.02864
+## 12 2019     college grad Smoking    0.01506
+## 13 2020      some school Smoking    0.02460
+## 14 2020 high school grad Smoking    0.03738
+## 15 2020     some college Smoking    0.02763
+## 16 2020     college grad Smoking    0.01243
 ```
 
 ## Smoking and Drinking Prevalence
@@ -681,9 +655,7 @@ ggplot(data=consumers, aes(x=Year, y=Prevalence, group=Factor, color=Factor)) +
     geom_line() + facet_grid(Factor ~ Education, scales="free_y")
 ```
 
-![](sql_examples_files/figure-html/unnamed-chunk-33-1.png)\
-
-
+![](sql_examples_files/figure-html/unnamed-chunk-27-1.png)<!-- -->
 
 ## Close Database Connection
 
@@ -692,9 +664,5 @@ Once we are done with the database, we can close the connection to it.
 
 ```r
 # Close connection
-dbDisconnect(con)
-```
-
-```
-## [1] TRUE
+dbDisconnect(con, shutdown = TRUE)
 ```
