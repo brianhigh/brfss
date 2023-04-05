@@ -55,7 +55,7 @@ Set `knitr` rendering options and the default number of digits for printing.
 
 
 ```r
-opts_chunk$set(tidy=FALSE, cache=FALSE)
+opts_chunk$set(tidy=FALSE, cache=TRUE)
 options(digits=4)
 ```
 
@@ -65,7 +65,7 @@ Connect to the DuckDB database file.
 
 
 ```r
-ddb_fn <- "brfss_data.duckdb"
+ddb_fn <- file.path("data", "brfss_data.duckdb")
 con <- duckdb::dbConnect(duckdb(), ddb_fn)
 ```
 

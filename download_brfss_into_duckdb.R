@@ -38,7 +38,8 @@ download_data <- function(url) {
 }
 
 # Open database connection
-con <- duckdb::dbConnect(duckdb(), "brfss_data.duckdb")
+dir.create(file.path("data"), recursive = TRUE, showWarnings = FALSE)
+con <- duckdb::dbConnect(duckdb(), file.path("data", "brfss_data.duckdb"))
 
 # Download, import, and save data for all years
 result <- map(urls, download_data)
@@ -47,7 +48,7 @@ result <- map(urls, download_data)
 duckdb::dbDisconnect(con, shutdown = TRUE)
 
 # Check that database contains data from years 2017-2021
-con <- duckdb::dbConnect(duckdb(), "brfss_data.duckdb")
+con <- duckdb::dbConnect(duckdb(), file.path("data", "brfss_data.duckdb"))
 brfss_data <- tbl(con, "brfss_data")
 result <- brfss_data %>% rename("Year" = IYEAR) %>% 
   select(Year, SEQNO) %>% 
