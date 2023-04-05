@@ -65,7 +65,11 @@ result <- brfss_data %>%
   select("Year" = IYEAR, "State" = `_STATE`) %>% 
   group_by(Year, State) %>% 
   summarize(Respondents = n(), .groups = "drop") %>% 
-  arrange(Year, State)
+  group_by(Year) %>% 
+  summarize(`Mean Respondents` = mean(Respondents, na.rm = TRUE),
+            `SD Respondents` = sd(Respondents, na.rm = TRUE),
+            .groups = "drop") %>% 
+  arrange(Year)
 result %>% show_query()
 result %>% collect()
 
