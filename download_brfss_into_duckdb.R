@@ -1,7 +1,8 @@
 # Download BRFSS data for a few years and export to a DuckDB database file.
 #
 # Depending on your internet connection, etc., this may take 16 minutes or more
-# to run. The DuckDB file it creates will be about 1.7 GB.
+# to run. The DuckDB file it creates will be about 1.4 GB. The size of the 
+# file can grow over time as DuckDB adds indexes to improve performance.
 
 # Attach packages, installing as needed
 if(!requireNamespace("pacman", quietly = TRUE)) install.packages("pacman")
@@ -51,20 +52,14 @@ store_data <- function(yr, con, tbl_name = "brfss") {
   }
 }
 
-# Define a function to create indexes
-create_indexes <- function(con, tbl_name = "brfss") {
-  # Add indexes to prevent appending duplicates and improve query performance
-  dbcols <- 
-    list(c("SEQNO", "_STATE"), c("IYEAR"), c("_STATE"), c("IYEAR", "_STATE"))
-  map(dbcols, ~ {
-    idx <-
-      sprintf("%s_%s_idx", tbl_name, tolower(paste(.x, collapse = "_")))
-    dbc <- paste(.x, collapse = ", ")
-    uni <- ifelse(grepl("seqno__state", idx), "UNIQUE", "")
-    sql <-sprintf('DROP INDEX IF EXISTS %s; CREATE %s INDEX %s ON %s (%s);',
-            idx, uni, idx, tbl_name, dbc)
-    dbExecute(con, sql)
-  })
+# Define a function to create a database index
+create_index <- function(dbcols, uniq = FALSE, con, tbl_name = "brfss") {
+  idx <- sprintf("%s_%s_idx", tbl_name, tolower(paste(dbcols, collapse = "_")))
+  dbc <- paste(dbcols, collapse = ", ")
+  uni <- ifelse(uniq == TRUE, "UNIQUE", "")
+  sql <-sprintf('DROP INDEX IF EXISTS %s; CREATE %s INDEX %s ON %s (%s);',
+          idx, uni, idx, tbl_name, dbc)
+  dbExecute(con, sql)
 }
 
 # Open database connection
@@ -84,8 +79,8 @@ result <- map(years, store_data, con = con)
 # Stop timer
 toc()
 
-# Create indexes
-#result <- create_indexes(con)
+# Create index for improved performance and to prevent duplication
+result <- create_index(c("SEQNO", "_STATE", "IYEAR"), uniq = TRUE, con = con)
 
 # Close database connection
 dbDisconnect(con, shutdown = TRUE)
