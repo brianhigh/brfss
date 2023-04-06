@@ -18,9 +18,9 @@ logo: logo_128.png
 editor_options: 
   chunk_output_type: console
 ---
-  
+
 ## SQL Examples: Smoking and Drinking
-  
+
 This is a demo of some basic SQL `SELECT` queries using BRFSS data from: 
 http://www.cdc.gov/brfss/. 
 
@@ -36,13 +36,12 @@ The CDC has provided a
 for use in understanding variables and codes. In particular, we will focus on tobacco use and alcohol consumption in 
 the state of Washington.
 
-## Install Packages and Set Options
+## Setup
 
-Load the required R packages, installing as necessary.
+Load the required R packages, installing as needed.
 
 
 ```r
-# Attach packages, installing as needed
 if(!requireNamespace("pacman", quietly = TRUE)) install.packages("pacman")
 pacman::p_load(knitr, dplyr, ggplot2, tidyr, duckdb)
 ```
@@ -54,8 +53,6 @@ Set `knitr` rendering options and the default number of digits for printing.
 opts_chunk$set(tidy=FALSE, cache=FALSE)
 options(digits=4)
 ```
-
-## Connect to DuckDB Database
 
 Connect to the DuckDB database file.
 
@@ -71,7 +68,7 @@ Print the number of rows and columns, as well as number of indexes.
 
 
 ```r
-sql <- "SELECT COUNT(*) AS rows FROM brfss_data;"
+sql <- "SELECT COUNT(*) AS rows FROM brfss;"
 rs <- dbGetQuery(con, sql)
 cat(rs$rows, "rows")
 ```
@@ -81,7 +78,7 @@ cat(rs$rows, "rows")
 ```
 
 ```r
-sql <- "SELECT * FROM brfss_data LIMIT 1;"
+sql <- "SELECT * FROM brfss LIMIT 1;"
 rs <- dbGetQuery(con, sql)
 cat(ncol(rs), "columns")
 ```
@@ -97,7 +94,7 @@ cat(nrow(rs), "indexes")
 ```
 
 ```
-## 2 indexes
+## 0 indexes
 ```
 
 ## Count Respondents by Year
@@ -108,7 +105,7 @@ Washington state (`_STATE = 53`), sorting by year (`ORDER BY`).
 
 ```r
 sql <- "SELECT IYEAR AS Year, COUNT(*) AS Respondents 
-        FROM brfss_data 
+        FROM brfss 
         WHERE _STATE = 53 
         GROUP BY IYEAR 
         ORDER BY IYEAR;"
@@ -137,7 +134,7 @@ Look at the number of respondents in 2021 and aggregate by education level.
 
 ```r
 sql <- "SELECT _EDUCAG AS Education, COUNT(*) AS Respondents 
-        FROM brfss_data 
+        FROM brfss 
         WHERE IYEAR = 2021 AND _STATE = 53 
         GROUP BY _EDUCAG 
         ORDER BY _EDUCAG;"
@@ -166,7 +163,7 @@ a smoker or not. A value of `1` (Every day) or `2` (Some days) means
 ```r
 sql <- "SELECT _EDUCAG AS Education, 
 COUNT(USENOW3) AS Smokers 
-FROM brfss_data 
+FROM brfss 
 WHERE IYEAR = 2021 AND _STATE = 53 AND _EDUCAG <= 4 
 AND (USENOW3 = 1 OR USENOW3 = 2) 
 GROUP BY _EDUCAG 
@@ -195,7 +192,7 @@ query by using the `IF()` function within the `COUNT()` function.
 sql <- "SELECT _EDUCAG AS Education, 
 COUNT(*) AS Respondents, 
 COUNT(IF(USENOW3 = 1 OR USENOW3 = 2, 1, NULL)) AS Smokers 
-FROM brfss_data 
+FROM brfss 
 WHERE IYEAR = 2021 AND _STATE = 53 AND _EDUCAG <= 4 
 GROUP BY _EDUCAG 
 ORDER BY _EDUCAG;"
@@ -280,16 +277,12 @@ How has smoking changed from 2012 to 2021?
 sql <- "SELECT IYEAR AS Year, _EDUCAG AS Education, 
 COUNT(*) AS Respondents, 
 COUNT(IF(USENOW3 = 1 OR USENOW3 = 2, 1, NULL)) AS Smokers
-FROM brfss_data 
+FROM brfss 
 WHERE (IYEAR BETWEEN 2012 AND 2021)
 AND _STATE = 53 
 AND _EDUCAG <= 4 
 GROUP BY IYEAR, _EDUCAG 
 ORDER BY IYEAR, _EDUCAG DESC;"
-
-# The WHERE clause could also use: WHERE (IYEAR BETWEEN 2011 AND 2014)
-# The WHERE clause could also use: WHERE (IYEAR >= 2011 and IYEAR <= 2014)
-# But these will not take full advantage of our INDEX and will run slower.
 
 rs <- dbGetQuery(con, sql)
 rs %>% group_by(Year, Education) %>% 
@@ -320,7 +313,7 @@ indicate if the survey respondent is currently a drinker or not. A value of
 sql <- "SELECT _EDUCAG AS Education, 
 COUNT(*) AS Respondents, 
 COUNT(IF(DRNKANY5 = 1, 1, NULL)) AS Drinkers 
-FROM brfss_data 
+FROM brfss 
 WHERE IYEAR = 2021
 AND _STATE = 53 
 AND _EDUCAG <= 4 
@@ -372,7 +365,7 @@ Let's see how drinking compares from 2012 to 2021.
 sql <- "SELECT IYEAR AS Year, _EDUCAG AS Education, 
 COUNT(*) AS Respondents, 
 COUNT(IF(DRNKANY5 = 1, 1, NULL)) AS Drinkers 
-FROM brfss_data 
+FROM brfss 
 WHERE (IYEAR BETWEEN 2012 AND 2021)
 AND _STATE = 53 
 AND _EDUCAG <= 4 
@@ -406,7 +399,7 @@ sql <- "SELECT IYEAR AS Year, _EDUCAG AS Education,
 COUNT(*) AS Respondents, 
 COUNT(IF(USENOW3 = 1 OR USENOW3 = 2, 1, NULL)) AS Smokers, 
 COUNT(IF(DRNKANY5 = 1, 1, NULL)) AS Drinkers 
-FROM brfss_data 
+FROM brfss 
 WHERE (IYEAR BETWEEN 2012 AND 2021)
 AND _STATE = 53 
 AND _EDUCAG <= 4 
@@ -505,7 +498,7 @@ code instead if SQL to get your data from the database.
 
 
 ```r
-brfss_data <- tbl(con, "brfss_data")
+brfss_data <- tbl(con, "brfss")
 result <- brfss_data %>% 
   rename("Year" = IYEAR, "Education" = `_EDUCAG`, State = `_STATE`) %>% 
   select(Year, Education, State, USENOW3, DRNKANY5) %>%
@@ -524,21 +517,13 @@ result %>% show_query()
 
 ```
 ## <SQL>
-## SELECT *
-## FROM (
-##   SELECT
-##     IYEAR AS "Year",
-##     _EDUCAG AS Education,
-##     _STATE AS State,
-##     USENOW3,
-##     DRNKANY5
-##   FROM brfss_data
-## ) q01
+## SELECT IYEAR AS "Year", _EDUCAG AS Education, _STATE AS State, USENOW3, DRNKANY5
+## FROM brfss
 ## WHERE
-##   ("Year" >= 2012.0) AND
-##   ("Year" <= 2021.0) AND
-##   (State = 53.0) AND
-##   (Education <= 4.0)
+##   (IYEAR >= 2012.0) AND
+##   (IYEAR <= 2021.0) AND
+##   (_STATE = 53.0) AND
+##   (_EDUCAG <= 4.0)
 ```
 
 ## Prepare Data for Plotting
@@ -584,7 +569,7 @@ we can just use R commands for subsetting and work entirely from memory.
 
 ```r
 # Get all Washington State data from 2012-2021 from database as a dataframe
-brfss_data <- tbl(con, "brfss_data")
+brfss_data <- tbl(con, "brfss")
 result <- brfss_data %>% 
   filter(IYEAR >= 2012, IYEAR <= 2021, `_STATE` == 53)
 brfsswa1221 <- result %>% collect()
@@ -623,7 +608,7 @@ cat("The data table consumes", object.size(brfsswa1221) / 1024^2, "MB",
 
 ```r
 # Save as a RDS and check on the size
-filename <- "brfsswa1221.rds"
+filename <- file.path("data", "brfsswa1221.rds")
 if (! file.exists(filename)) saveRDS(brfsswa1221, filename)
 cat(paste(c("Size of RDS file is", 
             round(file.size(filename) / 1024^2, 1), "MB", "\n")))
@@ -635,7 +620,7 @@ cat(paste(c("Size of RDS file is",
 
 In the future, if we only want to work with Washington State data from 2012-2021, then we can just read from the RDS file instead of using the Duck DB database.
 
-## Query, Aggregate and Factor
+## Reproduce Results without SQL
 
 We can test our subset by reproducing our SQL query with R commands as before.
 

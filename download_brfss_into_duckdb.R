@@ -1,77 +1,91 @@
-# Download BRFSS data for a few years and export to a DuckDB database file
+# Download BRFSS data for a few years and export to a DuckDB database file.
+#
+# Depending on your internet connection, etc., this may take 16 minutes or more
+# to run. The DuckDB file it creates will be about 1.7 GB.
 
 # Attach packages, installing as needed
 if(!requireNamespace("pacman", quietly = TRUE)) install.packages("pacman")
-pacman::p_load(haven, purrr, dplyr, duckdb)
-
-# Define base URL and years for BRFSS SAS data
-base_url <- "https://www.cdc.gov/brfss/annual_data/"
-years <- 2012:2021
-
-# Define URLs for BRFSS SAS data for years 2017 through 2021
-urls <- paste0(base_url, years, "/files/LLCP", years, "XPT.zip")
+pacman::p_load(haven, purrr, dplyr, duckdb, tictoc)
 
 # Define function to download and import data for a given year
-download_data <- function(url) {
+get_data <- function(yr, con) {
   # Download ZIP file and extract XPT file
   temp_file <- tempfile(fileext = ".zip")
+  temp_dir <- file.path(tempdir(), "brfss_data")
+  url_tmpl <- "https://www.cdc.gov/brfss/annual_data/%s/files/LLCP%sXPT.zip"
+  url <- sprintf(url_tmpl, yr, yr)
   download.file(url, temp_file, mode = "wb", quiet = TRUE)
   on.exit(unlink(temp_file))
-  unzip(temp_file, exdir = "brfss_data")
+  unzip(temp_file, exdir = temp_dir)
   
-  # Read XPT files into a dataframe
-  files <- list.files("brfss_data", pattern = ".XPT", full.names = TRUE)
-  brfss_data <- map_df(files, read_xpt)
+  # Read XPT file(s) into a dataframe
+  files <- list.files(temp_dir, pattern = ".XPT", full.names = TRUE)
+  df <- map_df(files, read_xpt)
   
   # Remove temporary files and folders
-  unlink("brfss_data", recursive = TRUE)
+  unlink(temp_dir, recursive = TRUE)
+  
+  # Return dataframe
+  return(df)
+}
 
-  # Store data in database
-  if ("brfss_data" %in% dbListTables(con, "brfss_data")) {
-    # Append data frame to DuckDB file, restricting to common columns
-    brfss_data <- brfss_data %>% select(any_of(dbListFields(con, "brfss_data")))
-    duckdb::dbWriteTable(con, "brfss_data", brfss_data, append = TRUE)
+# Define function to store BRFSS data in DuckDB database
+store_data <- function(yr, con, tbl_name = "brfss") {
+  # Store data in database, unless this year has already been stored
+  if (tbl_name %in% dbListTables(con)) {
+    # Check to make sure this year has not already been stored, noting that
+    # each data file will usually include several rows for the following year
+    sql_tmpl <- 'SELECT COUNT(*) as N FROM %s WHERE IYEAR = %s;'
+    sql <- sprintf(sql_tmpl, tbl_name, yr)
+    rs <- dbGetQuery(con, sql) %>% pull(N)
+    # Years 2012-2021 should have >100K rows each, so import if less than this
+    if (rs < 100000) {
+      # Download and append data to DuckDB file, restricting to common columns
+      df <- get_data(yr, con) %>% select(any_of(dbListFields(con, tbl_name)))
+      dbWriteTable(con, tbl_name, df, append = TRUE)
+    } else { warning(paste("Data for", yr, "has already been stored.")) }
   } else {
-    # Save data frame to new DuckDB table
-    duckdb::dbWriteTable(con, "brfss_data", brfss_data)
+    # Download, import and store data as new DuckDB table
+    df <- get_data(yr, con)
+    dbWriteTable(con, tbl_name, df)
   }
+}
+
+# Define a function to create indexes
+create_indexes <- function(con, tbl_name = "brfss") {
+  # Add indexes to prevent appending duplicates and improve query performance
+  dbcols <- 
+    list(c("SEQNO", "_STATE"), c("IYEAR"), c("_STATE"), c("IYEAR", "_STATE"))
+  map(dbcols, ~ {
+    idx <-
+      sprintf("%s_%s_idx", tbl_name, tolower(paste(.x, collapse = "_")))
+    dbc <- paste(.x, collapse = ", ")
+    uni <- ifelse(grepl("seqno__state", idx), "UNIQUE", "")
+    sql <-sprintf('DROP INDEX IF EXISTS %s; CREATE %s INDEX %s ON %s (%s);',
+            idx, uni, idx, tbl_name, dbc)
+    dbExecute(con, sql)
+  })
 }
 
 # Open database connection
 dir.create(file.path("data"), recursive = TRUE, showWarnings = FALSE)
-con <- duckdb::dbConnect(duckdb(), file.path("data", "brfss_data.duckdb"))
+duckdb_path <- file.path("data", "brfss_data.duckdb")
+con <- dbConnect(duckdb(), duckdb_path)
 
-# Download, import, and save data for all years
-result <- map(urls, download_data)
+# Start timer
+tic()
 
-# Close database connection
-duckdb::dbDisconnect(con, shutdown = TRUE)
+# Define years of BRFSS data to download
+years <- 2012:2021
 
-# ------------ Tests --------------
+# Get and store data for a vector of years
+result <- map(years, store_data, con = con)
 
-# Open database connection
-con <- duckdb::dbConnect(duckdb(), file.path("data", "brfss_data.duckdb"))
+# Stop timer
+toc()
 
-# Add two indexes to improve query performance, removing first if already there 
-dbExecute(con, 
-          "DROP INDEX IF EXISTS brfss_iyear_idx;
-           DROP INDEX IF EXISTS brfss_iyear_state_idx;
-           CREATE INDEX brfss_iyear_idx ON brfss_data (IYEAR);
-           CREATE INDEX brfss_iyear_state_idx ON brfss_data (IYEAR, _STATE);")
-
-# Check that database contains data from years 2017-2021
-brfss_data <- tbl(con, "brfss_data")
-result <- brfss_data %>% 
-  select("Year" = IYEAR, "State" = `_STATE`) %>% 
-  group_by(Year, State) %>% 
-  summarize(Respondents = n(), .groups = "drop") %>% 
-  group_by(Year) %>% 
-  summarize(`Mean Respondents` = mean(Respondents, na.rm = TRUE),
-            `SD Respondents` = sd(Respondents, na.rm = TRUE),
-            .groups = "drop") %>% 
-  arrange(Year)
-result %>% show_query()
-result %>% collect()
+# Create indexes
+#result <- create_indexes(con)
 
 # Close database connection
-duckdb::dbDisconnect(con, shutdown = TRUE)
+dbDisconnect(con, shutdown = TRUE)
