@@ -177,12 +177,13 @@ ggplot(smokers, aes(x = Education, y = `Smoking Prevalence`, fill = Education)) 
 
 ## Count Smokers by Education and Year
 
-How has smoking changed from 2012 to 2021?
+Let's compare smoking by year from 2012 to 2021. We will modify our prevalence 
+calculation to exclude the "Don't Know/Refused/Missing" responses from the denominator.
 
 ```{r}
 sql <- "SELECT IYEAR AS Year, _EDUCAG AS Education, 
-COUNT(*) AS Respondents, 
-COUNT(IF(SMOKDAY2 = 1 OR SMOKDAY2 = 2, 1, NULL)) AS Smokers
+COUNT(IF(SMOKDAY2 = 1 OR SMOKDAY2 = 2, 1, NULL)) AS Smokers, 
+COUNT(IF(SMOKDAY2 = 3, 1, NULL)) AS NonSmokers 
 FROM brfss 
 WHERE (IYEAR BETWEEN 2012 AND 2021)
 AND _STATE = 53 
@@ -192,7 +193,7 @@ ORDER BY IYEAR, _EDUCAG DESC;"
 
 rs <- dbGetQuery(con, sql)
 smokers <- rs %>% group_by(Year, Education) %>% 
-    mutate(`Smoking Prevalence` = Smokers/Respondents,
+    mutate(`Smoking Prevalence` = Smokers/sum(Smokers, NonSmokers, na.rm = TRUE),
            Education = factor(Education, levels = 1:4, labels = edu.labels),
            Year = factor(Year))
 ```
@@ -280,12 +281,14 @@ ggplot(drinkers, aes(x = Education, y = `Drinking Prevalence`, fill = Education)
 
 ## Count Drinkers by Education and Year
 
-Let's see how drinking compares from 2012 to 2021.
+Let's see how drinking compares from 2012 to 2021. We will also
+modify our prevalence calculation to exclude the "Don't Know/Refused/Missing" 
+responses from the denominator.
 
 ```{r}
 sql <- "SELECT IYEAR AS Year, _EDUCAG AS Education, 
-COUNT(*) AS Respondents, 
-COUNT(IF(DRNKANY5 = 1, 1, NULL)) AS Drinkers 
+COUNT(IF(DRNKANY5 = 1, 1, NULL)) AS Drinkers, 
+COUNT(IF(DRNKANY5 = 2, 1, NULL)) AS NonDrinkers 
 FROM brfss 
 WHERE (IYEAR BETWEEN 2012 AND 2021)
 AND _STATE = 53 
@@ -295,7 +298,8 @@ ORDER BY IYEAR, _EDUCAG DESC;"
 
 rs <- dbGetQuery(con, sql)
 drinkers <- rs %>% group_by(Year, Education) %>% 
-    mutate(`Drinking Prevalence` = Drinkers/Respondents,
+    mutate(`Drinking Prevalence` = 
+             Drinkers/sum(Drinkers, NonDrinkers, na.rm = TRUE),
            Education = factor(Education, levels = 1:4, labels = edu.labels))
 ```
 
@@ -316,20 +320,31 @@ on one occasion and females having four or more drinks on one occasion
 sql <- "SELECT IYEAR AS Year, _EDUCAG AS Education, 
 COUNT(*) AS Respondents, 
 COUNT(IF(DRNKANY5 = 1, 1, NULL)) AS Drinkers, 
-COUNT(IF(_RFBING5 = 2, 1, NULL)) AS BingeDrinkers 
+COUNT(IF(DRNKANY5 = 2, 1, NULL)) AS NonDrinkers, 
+COUNT(IF(_RFBING5 = 2, 1, NULL)) AS BingeDrinkers, 
+COUNT(IF(_RFBING5 = 1, 1, NULL)) AS NonBingeDrinkers 
 FROM brfss 
 WHERE (IYEAR BETWEEN 2012 AND 2021)
 AND _STATE = 53 
 AND _EDUCAG <= 4 
 GROUP BY IYEAR, _EDUCAG 
 ORDER BY IYEAR, _EDUCAG DESC;"
+```
 
+## Drinkers and Binge Drinkers
+
+As before, we will exclude the "Don't Know/Refused/Missing" 
+responses from the denominator in our our prevalence calculations.
+
+```{r}
 rs <- dbGetQuery(con, sql)
 drinkers <- rs %>% group_by(Year, Education) %>% 
-  mutate(Drinkers = Drinkers/Respondents,
-         `Binge Drinkers` = BingeDrinkers/Respondents,
+  mutate(Drinkers = 
+           Drinkers/sum(Drinkers, NonDrinkers, na.rm = TRUE),
+         `Binge Drinkers` = 
+           BingeDrinkers/sum(BingeDrinkers, NonBingeDrinkers, na.rm = TRUE),
          Education = factor(Education, levels = 1:4, labels = edu.labels)) %>% 
-  select(-Respondents, -BingeDrinkers) %>%
+  select(-Respondents, -NonDrinkers, -BingeDrinkers, -NonBingeDrinkers) %>%
   pivot_longer(c(-Year, -Education), names_to = "Type", values_to = "Prevalence")
 ```
 
@@ -348,9 +363,10 @@ We can retrieve the smoking and drinking data with a single query:
 
 ```{r}
 sql <- "SELECT IYEAR AS Year, _EDUCAG AS Education, 
-COUNT(*) AS Respondents, 
 COUNT(IF(SMOKDAY2 = 1 OR SMOKDAY2 = 2, 1, NULL)) AS Smokers, 
-COUNT(IF(DRNKANY5 = 1, 1, NULL)) AS Drinkers 
+COUNT(IF(SMOKDAY2 = 3, 1, NULL)) AS NonSmokers,
+COUNT(IF(DRNKANY5 = 1, 1, NULL)) AS Drinkers,
+COUNT(IF(DRNKANY5 = 2, 1, NULL)) AS NonDrinkers
 FROM brfss 
 WHERE (IYEAR BETWEEN 2012 AND 2021)
 AND _STATE = 53 
@@ -360,9 +376,10 @@ ORDER BY IYEAR, _EDUCAG;"
 
 rs <- dbGetQuery(con, sql)
 consumers <- rs %>% group_by(Year, Education) %>% 
-  mutate(Smoking=Smokers/Respondents, 
-         Drinking=Drinkers/Respondents,
-         Education = factor(Education, levels = 1:4, labels = edu.labels))
+  mutate(Smoking = Smokers/sum(Smokers, NonSmokers, na.rm = TRUE), 
+         Drinking = Drinkers/sum(NonDrinkers, NonDrinkers, na.rm = TRUE),
+         Education = factor(Education, levels = 1:4, labels = edu.labels)) %>%
+  select(Year, Education, Smoking, Drinking)
 ```
 
 From this dataframe, just subset as needed to produce tables and plots.
@@ -381,7 +398,6 @@ we will need to convert the data structure from "wide" to "long" format. The
 
 ```{r}
 consumers <- consumers %>% 
-  select(Year, Education, Smoking, Drinking) %>% 
   pivot_longer(c(Smoking, Drinking), 
                names_to = "Factor", values_to = "Prevalence")
 consumers %>% head()
@@ -428,11 +444,14 @@ To actually execute the SQL query, we use `collect()`. Then we perform the same 
 ```{r}
 consumers <- collect(result) %>% 
   mutate(Smoker = ifelse(SMOKDAY2 %in% 1:2, 1, 0)) %>% 
+  mutate(NonSmoker = ifelse(SMOKDAY2 == 3, 1, 0)) %>% 
   mutate(Drinker = ifelse(DRNKANY5 == 1, 1, 0)) %>% 
+  mutate(NonDrinker = ifelse(DRNKANY5 == 2, 1, 0)) %>% 
   group_by(Year, Education) %>% 
-  summarize(Smoking = sum(Smoker, na.rm = TRUE)/n(),
-            Drinking = sum(Drinker, na.rm = TRUE)/n(),
-            .groups = "keep") %>% 
+  summarize(
+    Smoking = sum(Smoker, na.rm = TRUE)/sum(Smoker, NonSmoker, na.rm = TRUE),
+    Drinking = sum(Drinker, na.rm = TRUE)/sum(Drinker, NonDrinker, na.rm = TRUE),
+    .groups = "keep") %>% 
   mutate(Education = factor(Education, levels = 1:4, labels = edu.labels)) %>% 
   pivot_longer(c(Smoking, Drinking), 
                names_to = "Factor", values_to = "Prevalence")
@@ -443,7 +462,7 @@ consumers <- collect(result) %>%
 ```{r}
 # Use the same ggplot() command as before
 ggplot(consumers, aes(x = Year, y = Prevalence, group = Factor, color = Factor)) + 
-    geom_line() + facet_grid(Factor ~ Education, scales="free_y") + 
+    geom_line() + facet_grid(Factor ~ Education, scales = "free_y") + 
     theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) + 
     scale_color_manual(values = cbPalette)
 ```
@@ -495,11 +514,14 @@ consumers <- brfsswa1221 %>%
   select(Year, Education, State, SMOKDAY2, DRNKANY5) %>%
   filter(Year >= 2012, Year <= 2021, State == 53, Education <= 4) %>% 
   mutate(Smoker = ifelse(SMOKDAY2 %in% 1:2, 1, 0)) %>% 
+  mutate(NonSmoker = ifelse(SMOKDAY2 == 3, 1, 0)) %>% 
   mutate(Drinker = ifelse(DRNKANY5 == 1, 1, 0)) %>% 
+  mutate(NonDrinker = ifelse(DRNKANY5 == 2, 1, 0)) %>% 
   group_by(Year, Education) %>% 
-  summarize(Smoking = sum(Smoker, na.rm = TRUE)/n(),
-            Drinking = sum(Drinker, na.rm = TRUE)/n(),
-            .groups = "keep") %>% 
+  summarize(
+    Smoking = sum(Smoker, na.rm = TRUE)/sum(Smoker, NonSmoker, na.rm = TRUE),
+    Drinking = sum(Drinker, na.rm = TRUE)/sum(Drinker, NonDrinker, na.rm = TRUE),
+    .groups = "keep") %>% 
   mutate(Education = factor(Education, levels = 1:4, labels = edu.labels)) %>% 
   pivot_longer(c(Smoking, Drinking), 
                names_to = "Factor", values_to = "Prevalence")
@@ -510,7 +532,7 @@ consumers <- brfsswa1221 %>%
 ```{r}
 # Use the same ggplot() command as used earlier
 ggplot(consumers, aes(x = Year, y = Prevalence, group = Factor, color = Factor)) + 
-    geom_line() + facet_grid(Factor ~ Education, scales="free_y") + 
+    geom_line() + facet_grid(Factor ~ Education, scales = "free_y") + 
     theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) + 
     scale_color_manual(values = cbPalette)
 ```
@@ -570,11 +592,14 @@ result <- brfss_data %>%
 
 consumers <- collect(result) %>% 
   mutate(Smoker = ifelse(SMOKDAY2 %in% 1:2, 1, 0)) %>% 
+  mutate(NonSmoker = ifelse(SMOKDAY2 == 3, 1, 0)) %>% 
   mutate(Drinker = ifelse(DRNKANY5 == 1, 1, 0)) %>% 
+  mutate(NonDrinker = ifelse(DRNKANY5 == 2, 1, 0)) %>% 
   group_by(Year, State, Education) %>% 
-  summarize(Smoking = sum(Smoker, na.rm = TRUE)/n(),
-            Drinking = sum(Drinker, na.rm = TRUE)/n(),
-            .groups = "keep") %>% 
+  summarize(
+    Smoking = sum(Smoker, na.rm = TRUE)/sum(Smoker, NonSmoker, na.rm = TRUE),
+    Drinking = sum(Drinker, na.rm = TRUE)/sum(Drinker, NonDrinker, na.rm = TRUE),
+    .groups = "keep") %>% 
   mutate(Education = factor(Education, levels = 1:4, labels = edu.labels)) %>% 
   pivot_longer(c(Smoking, Drinking), 
                names_to = "Factor", values_to = "Prevalence") %>%
@@ -587,7 +612,7 @@ consumers <- collect(result) %>%
 ```{r}
 # Use the same ggplot() command as before, modified to color by state
 ggplot(consumers, aes(x = Year, y = Prevalence, group = State, color = State)) + 
-    geom_line() + facet_grid(Factor ~ Education, scales="free_y") + 
+    geom_line() + facet_grid(Factor ~ Education, scales = "free_y") + 
     theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) + 
     scale_color_manual(values = cbPalette)
 ```

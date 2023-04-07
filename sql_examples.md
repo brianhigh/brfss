@@ -270,13 +270,14 @@ ggplot(smokers, aes(x = Education, y = `Smoking Prevalence`, fill = Education)) 
 
 ## Count Smokers by Education and Year
 
-How has smoking changed from 2012 to 2021?
+Let's compare smoking by year from 2012 to 2021. We will modify our prevalence 
+calculation to exclude the "Don't Know/Refused/Missing" responses from the denominator.
 
 
 ```r
 sql <- "SELECT IYEAR AS Year, _EDUCAG AS Education, 
-COUNT(*) AS Respondents, 
-COUNT(IF(SMOKDAY2 = 1 OR SMOKDAY2 = 2, 1, NULL)) AS Smokers
+COUNT(IF(SMOKDAY2 = 1 OR SMOKDAY2 = 2, 1, NULL)) AS Smokers, 
+COUNT(IF(SMOKDAY2 = 3, 1, NULL)) AS NonSmokers 
 FROM brfss 
 WHERE (IYEAR BETWEEN 2012 AND 2021)
 AND _STATE = 53 
@@ -286,7 +287,7 @@ ORDER BY IYEAR, _EDUCAG DESC;"
 
 rs <- dbGetQuery(con, sql)
 smokers <- rs %>% group_by(Year, Education) %>% 
-    mutate(`Smoking Prevalence` = Smokers/Respondents,
+    mutate(`Smoking Prevalence` = Smokers/sum(Smokers, NonSmokers, na.rm = TRUE),
            Education = factor(Education, levels = 1:4, labels = edu.labels),
            Year = factor(Year))
 ```
@@ -397,13 +398,15 @@ ggplot(drinkers, aes(x = Education, y = `Drinking Prevalence`, fill = Education)
 
 ## Count Drinkers by Education and Year
 
-Let's see how drinking compares from 2012 to 2021.
+Let's see how drinking compares from 2012 to 2021. We will also
+modify our prevalence calculation to exclude the "Don't Know/Refused/Missing" 
+responses from the denominator.
 
 
 ```r
 sql <- "SELECT IYEAR AS Year, _EDUCAG AS Education, 
-COUNT(*) AS Respondents, 
-COUNT(IF(DRNKANY5 = 1, 1, NULL)) AS Drinkers 
+COUNT(IF(DRNKANY5 = 1, 1, NULL)) AS Drinkers, 
+COUNT(IF(DRNKANY5 = 2, 1, NULL)) AS NonDrinkers 
 FROM brfss 
 WHERE (IYEAR BETWEEN 2012 AND 2021)
 AND _STATE = 53 
@@ -413,7 +416,8 @@ ORDER BY IYEAR, _EDUCAG DESC;"
 
 rs <- dbGetQuery(con, sql)
 drinkers <- rs %>% group_by(Year, Education) %>% 
-    mutate(`Drinking Prevalence` = Drinkers/Respondents,
+    mutate(`Drinking Prevalence` = 
+             Drinkers/sum(Drinkers, NonDrinkers, na.rm = TRUE),
            Education = factor(Education, levels = 1:4, labels = edu.labels))
 ```
 
@@ -438,20 +442,32 @@ on one occasion and females having four or more drinks on one occasion
 sql <- "SELECT IYEAR AS Year, _EDUCAG AS Education, 
 COUNT(*) AS Respondents, 
 COUNT(IF(DRNKANY5 = 1, 1, NULL)) AS Drinkers, 
-COUNT(IF(_RFBING5 = 2, 1, NULL)) AS BingeDrinkers 
+COUNT(IF(DRNKANY5 = 2, 1, NULL)) AS NonDrinkers, 
+COUNT(IF(_RFBING5 = 2, 1, NULL)) AS BingeDrinkers, 
+COUNT(IF(_RFBING5 = 1, 1, NULL)) AS NonBingeDrinkers 
 FROM brfss 
 WHERE (IYEAR BETWEEN 2012 AND 2021)
 AND _STATE = 53 
 AND _EDUCAG <= 4 
 GROUP BY IYEAR, _EDUCAG 
 ORDER BY IYEAR, _EDUCAG DESC;"
+```
 
+## Drinkers and Binge Drinkers
+
+As before, we will exclude the "Don't Know/Refused/Missing" 
+responses from the denominator in our our prevalence calculations.
+
+
+```r
 rs <- dbGetQuery(con, sql)
 drinkers <- rs %>% group_by(Year, Education) %>% 
-  mutate(Drinkers = Drinkers/Respondents,
-         `Binge Drinkers` = BingeDrinkers/Respondents,
+  mutate(Drinkers = 
+           Drinkers/sum(Drinkers, NonDrinkers, na.rm = TRUE),
+         `Binge Drinkers` = 
+           BingeDrinkers/sum(BingeDrinkers, NonBingeDrinkers, na.rm = TRUE),
          Education = factor(Education, levels = 1:4, labels = edu.labels)) %>% 
-  select(-Respondents, -BingeDrinkers) %>%
+  select(-Respondents, -NonDrinkers, -BingeDrinkers, -NonBingeDrinkers) %>%
   pivot_longer(c(-Year, -Education), names_to = "Type", values_to = "Prevalence")
 ```
 
@@ -465,7 +481,7 @@ ggplot(drinkers, aes(x = Year, y = Prevalence,
   theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
 ```
 
-![](sql_examples_files/figure-html/unnamed-chunk-21-1.png)<!-- -->
+![](sql_examples_files/figure-html/unnamed-chunk-22-1.png)<!-- -->
 
 ## Why so many queries?
 
@@ -474,9 +490,10 @@ We can retrieve the smoking and drinking data with a single query:
 
 ```r
 sql <- "SELECT IYEAR AS Year, _EDUCAG AS Education, 
-COUNT(*) AS Respondents, 
 COUNT(IF(SMOKDAY2 = 1 OR SMOKDAY2 = 2, 1, NULL)) AS Smokers, 
-COUNT(IF(DRNKANY5 = 1, 1, NULL)) AS Drinkers 
+COUNT(IF(SMOKDAY2 = 3, 1, NULL)) AS NonSmokers,
+COUNT(IF(DRNKANY5 = 1, 1, NULL)) AS Drinkers,
+COUNT(IF(DRNKANY5 = 2, 1, NULL)) AS NonDrinkers
 FROM brfss 
 WHERE (IYEAR BETWEEN 2012 AND 2021)
 AND _STATE = 53 
@@ -486,9 +503,10 @@ ORDER BY IYEAR, _EDUCAG;"
 
 rs <- dbGetQuery(con, sql)
 consumers <- rs %>% group_by(Year, Education) %>% 
-  mutate(Smoking=Smokers/Respondents, 
-         Drinking=Drinkers/Respondents,
-         Education = factor(Education, levels = 1:4, labels = edu.labels))
+  mutate(Smoking = Smokers/sum(Smokers, NonSmokers, na.rm = TRUE), 
+         Drinking = Drinkers/sum(NonDrinkers, NonDrinkers, na.rm = TRUE),
+         Education = factor(Education, levels = 1:4, labels = edu.labels)) %>%
+  select(Year, Education, Smoking, Drinking)
 ```
 
 From this dataframe, just subset as needed to produce tables and plots.
@@ -501,16 +519,16 @@ consumers %>% head()
 ```
 
 ```
-## # A tibble: 6 × 7
+## # A tibble: 6 × 4
 ## # Groups:   Year, Education [6]
-##   Year  Education        Respondents Smokers Drinkers Smoking Drinking
-##   <chr> <fct>                  <dbl>   <dbl>    <dbl>   <dbl>    <dbl>
-## 1 2012  some school              856     214      291  0.25      0.340
-## 2 2012  high school grad        3512     707     1700  0.201     0.484
-## 3 2012  some college            4635     728     2650  0.157     0.572
-## 4 2012  college grad            6280     387     4330  0.0616    0.689
-## 5 2013  some school              581     147      196  0.253     0.337
-## 6 2013  high school grad        2578     486     1242  0.189     0.482
+##   Year  Education        Smoking Drinking
+##   <chr> <fct>              <dbl>    <dbl>
+## 1 2012  some school        0.476    0.266
+## 2 2012  high school grad   0.382    0.486
+## 3 2012  some college       0.316    0.685
+## 4 2012  college grad       0.173    1.15 
+## 5 2013  some school        0.510    0.263
+## 6 2013  high school grad   0.357    0.487
 ```
 
 ## Smoking and Drinking in Long Format
@@ -522,7 +540,6 @@ we will need to convert the data structure from "wide" to "long" format. The
 
 ```r
 consumers <- consumers %>% 
-  select(Year, Education, Smoking, Drinking) %>% 
   pivot_longer(c(Smoking, Drinking), 
                names_to = "Factor", values_to = "Prevalence")
 consumers %>% head()
@@ -533,12 +550,12 @@ consumers %>% head()
 ## # Groups:   Year, Education [3]
 ##   Year  Education        Factor   Prevalence
 ##   <chr> <fct>            <chr>         <dbl>
-## 1 2012  some school      Smoking       0.25 
-## 2 2012  some school      Drinking      0.340
-## 3 2012  high school grad Smoking       0.201
-## 4 2012  high school grad Drinking      0.484
-## 5 2012  some college     Smoking       0.157
-## 6 2012  some college     Drinking      0.572
+## 1 2012  some school      Smoking       0.476
+## 2 2012  some school      Drinking      0.266
+## 3 2012  high school grad Smoking       0.382
+## 4 2012  high school grad Drinking      0.486
+## 5 2012  some college     Smoking       0.316
+## 6 2012  some college     Drinking      0.685
 ```
 
 ## Smoking and Drinking Prevalence
@@ -551,7 +568,7 @@ ggplot(consumers, aes(x = Year, y = Prevalence, group = Factor, color = Factor))
     scale_color_manual(values = cbPalette)
 ```
 
-![](sql_examples_files/figure-html/unnamed-chunk-25-1.png)<!-- -->
+![](sql_examples_files/figure-html/unnamed-chunk-26-1.png)<!-- -->
 
 ## Alternative to Writing SQL
 
@@ -604,11 +621,14 @@ To actually execute the SQL query, we use `collect()`. Then we perform the same 
 ```r
 consumers <- collect(result) %>% 
   mutate(Smoker = ifelse(SMOKDAY2 %in% 1:2, 1, 0)) %>% 
+  mutate(NonSmoker = ifelse(SMOKDAY2 == 3, 1, 0)) %>% 
   mutate(Drinker = ifelse(DRNKANY5 == 1, 1, 0)) %>% 
+  mutate(NonDrinker = ifelse(DRNKANY5 == 2, 1, 0)) %>% 
   group_by(Year, Education) %>% 
-  summarize(Smoking = sum(Smoker, na.rm = TRUE)/n(),
-            Drinking = sum(Drinker, na.rm = TRUE)/n(),
-            .groups = "keep") %>% 
+  summarize(
+    Smoking = sum(Smoker, na.rm = TRUE)/sum(Smoker, NonSmoker, na.rm = TRUE),
+    Drinking = sum(Drinker, na.rm = TRUE)/sum(Drinker, NonDrinker, na.rm = TRUE),
+    .groups = "keep") %>% 
   mutate(Education = factor(Education, levels = 1:4, labels = edu.labels)) %>% 
   pivot_longer(c(Smoking, Drinking), 
                names_to = "Factor", values_to = "Prevalence")
@@ -620,12 +640,12 @@ consumers <- collect(result) %>%
 ```r
 # Use the same ggplot() command as before
 ggplot(consumers, aes(x = Year, y = Prevalence, group = Factor, color = Factor)) + 
-    geom_line() + facet_grid(Factor ~ Education, scales="free_y") + 
+    geom_line() + facet_grid(Factor ~ Education, scales = "free_y") + 
     theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) + 
     scale_color_manual(values = cbPalette)
 ```
 
-![](sql_examples_files/figure-html/unnamed-chunk-29-1.png)<!-- -->
+![](sql_examples_files/figure-html/unnamed-chunk-30-1.png)<!-- -->
 
 ## Speeding up Queries
 
@@ -697,11 +717,14 @@ consumers <- brfsswa1221 %>%
   select(Year, Education, State, SMOKDAY2, DRNKANY5) %>%
   filter(Year >= 2012, Year <= 2021, State == 53, Education <= 4) %>% 
   mutate(Smoker = ifelse(SMOKDAY2 %in% 1:2, 1, 0)) %>% 
+  mutate(NonSmoker = ifelse(SMOKDAY2 == 3, 1, 0)) %>% 
   mutate(Drinker = ifelse(DRNKANY5 == 1, 1, 0)) %>% 
+  mutate(NonDrinker = ifelse(DRNKANY5 == 2, 1, 0)) %>% 
   group_by(Year, Education) %>% 
-  summarize(Smoking = sum(Smoker, na.rm = TRUE)/n(),
-            Drinking = sum(Drinker, na.rm = TRUE)/n(),
-            .groups = "keep") %>% 
+  summarize(
+    Smoking = sum(Smoker, na.rm = TRUE)/sum(Smoker, NonSmoker, na.rm = TRUE),
+    Drinking = sum(Drinker, na.rm = TRUE)/sum(Drinker, NonDrinker, na.rm = TRUE),
+    .groups = "keep") %>% 
   mutate(Education = factor(Education, levels = 1:4, labels = edu.labels)) %>% 
   pivot_longer(c(Smoking, Drinking), 
                names_to = "Factor", values_to = "Prevalence")
@@ -713,12 +736,12 @@ consumers <- brfsswa1221 %>%
 ```r
 # Use the same ggplot() command as used earlier
 ggplot(consumers, aes(x = Year, y = Prevalence, group = Factor, color = Factor)) + 
-    geom_line() + facet_grid(Factor ~ Education, scales="free_y") + 
+    geom_line() + facet_grid(Factor ~ Education, scales = "free_y") + 
     theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) + 
     scale_color_manual(values = cbPalette)
 ```
 
-![](sql_examples_files/figure-html/unnamed-chunk-33-1.png)<!-- -->
+![](sql_examples_files/figure-html/unnamed-chunk-34-1.png)<!-- -->
 
 ## Compare States: FIPS Codes
 
@@ -789,11 +812,14 @@ result <- brfss_data %>%
 
 consumers <- collect(result) %>% 
   mutate(Smoker = ifelse(SMOKDAY2 %in% 1:2, 1, 0)) %>% 
+  mutate(NonSmoker = ifelse(SMOKDAY2 == 3, 1, 0)) %>% 
   mutate(Drinker = ifelse(DRNKANY5 == 1, 1, 0)) %>% 
+  mutate(NonDrinker = ifelse(DRNKANY5 == 2, 1, 0)) %>% 
   group_by(Year, State, Education) %>% 
-  summarize(Smoking = sum(Smoker, na.rm = TRUE)/n(),
-            Drinking = sum(Drinker, na.rm = TRUE)/n(),
-            .groups = "keep") %>% 
+  summarize(
+    Smoking = sum(Smoker, na.rm = TRUE)/sum(Smoker, NonSmoker, na.rm = TRUE),
+    Drinking = sum(Drinker, na.rm = TRUE)/sum(Drinker, NonDrinker, na.rm = TRUE),
+    .groups = "keep") %>% 
   mutate(Education = factor(Education, levels = 1:4, labels = edu.labels)) %>% 
   pivot_longer(c(Smoking, Drinking), 
                names_to = "Factor", values_to = "Prevalence") %>%
@@ -807,12 +833,12 @@ consumers <- collect(result) %>%
 ```r
 # Use the same ggplot() command as before, modified to color by state
 ggplot(consumers, aes(x = Year, y = Prevalence, group = State, color = State)) + 
-    geom_line() + facet_grid(Factor ~ Education, scales="free_y") + 
+    geom_line() + facet_grid(Factor ~ Education, scales = "free_y") + 
     theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) + 
     scale_color_manual(values = cbPalette)
 ```
 
-![](sql_examples_files/figure-html/unnamed-chunk-37-1.png)<!-- -->
+![](sql_examples_files/figure-html/unnamed-chunk-38-1.png)<!-- -->
 
 ## Compare other Variables
 
