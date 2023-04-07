@@ -845,7 +845,7 @@ ggplot(consumers, aes(x = Year, y = Prevalence, group = State, color = State)) +
 Now that you know how to query the database, compare other variables, such as:
 
 - Smoking and drinking by income (`_INCOMG`) or race (`_RACE`)
-- Binge drinking (`_RFBING5`) by gender (`SEX`) or age (`_AGE80`)
+- Smoking and drinking by gender (`SEX`) or age (`_AGE80`)
 - BMI category (`_BMI5CAT`) and exercise (`EXERANY2`) or sleep (`SLEPTIM1`)
 - Health care access (`HLTHPLN1`) and household income (`INCOME2`)
 - Stress (`QLSTRES2`) and marital status (`MARITAL`)
