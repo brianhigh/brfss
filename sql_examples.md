@@ -435,7 +435,7 @@ ggplot(drinkers, aes(x = Year, y = `Drinking Prevalence`,
 
 Let's compare drinkers (`DRNKANY5 = 1`) and binge drinkers (`_RFBING5 = 2`) 
 for 2012-2021. Binge drinkers are defined as males having five or more drinks 
-on one occasion and females having four or more drinks on one occasion
+on one occasion and females having four or more drinks on one occasion.
 
 
 ```r
