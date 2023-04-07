@@ -407,11 +407,11 @@ lookup the FIPS code for Pacific NW states like this:
 ```{r}
 fips_fn <- file.path("data", "fips.txt")
 if (! file.exists(fips_fn)) {
-  url <- "https://transition.fcc.gov/oet/info/maps/census/fips/fips.txt"
-  download.file(url)
+  url <- "https://www.cdc.gov/brfss/annual_data/1996/files/fipscode.txt"
+  download.file(url, fips_fn)
 }
 
-fips <- suppressMessages(read_fwf(fips_fn, skip = 16, n_max = 51)) %>% 
+fips <- suppressMessages(read_fwf(fips_fn, skip = 3, n_max = 51)) %>% 
   rename("state_fips" = X1, "state_name" = X2) %>% 
   mutate(state_fips = as.numeric(state_fips)) %>%
   mutate(state_name = str_to_title(state_name)) %>%

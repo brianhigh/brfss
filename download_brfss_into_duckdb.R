@@ -1,8 +1,10 @@
 # Download BRFSS data for a few years and export to a DuckDB database file.
 #
 # Depending on your internet connection, etc., this may take 16 minutes or more
-# to run. The DuckDB file it creates will be about 1.4 GB. The size of the 
-# file can grow over time as DuckDB adds indexes to improve performance.
+# to run. The DuckDB file it creates will be about 1.4 GB without indexing and
+# 1.7 GB with indexing. The size of the file can grow over time as DuckDB adds 
+# more indexes to improve performance. After running "sql_examples.Rmd", the 
+# file may grow to 1.9 GB or more.
 
 # Attach packages, installing as needed
 if(!requireNamespace("pacman", quietly = TRUE)) install.packages("pacman")
