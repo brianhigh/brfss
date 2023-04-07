@@ -42,14 +42,15 @@ Load the required R packages, installing as needed.
 
 ```{r, echo=TRUE, message=FALSE}
 if(!requireNamespace("pacman", quietly = TRUE)) install.packages("pacman")
-pacman::p_load(knitr, dplyr, ggplot2, tidyr, duckdb)
+pacman::p_load(knitr, dplyr, ggplot2, tidyr, stringr, duckdb, readr)
 ```
 
-Set `knitr` rendering options and the default number of digits for printing.
+Set `knitr` rendering options, the number of digits to display, and a palette.
 
 ```{r set_options, echo=TRUE, message=FALSE}
 opts_chunk$set(tidy=FALSE, cache=FALSE)
 options(digits=4)
+cbPalette <- c("#CC79A7", "#D55E00", "#999999", "#0072B2", "#009E73")
 ```
 
 Connect to the DuckDB database file.
@@ -66,13 +67,13 @@ Print the number of rows and columns, as well as number of indexes.
 ```{r}
 sql <- "SELECT COUNT(*) AS rows FROM brfss;"
 rs <- dbGetQuery(con, sql)
-cat(rs$rows, "rows")
+cat(rs$rows, "row(s)")
 sql <- "SELECT * FROM brfss LIMIT 1;"
 rs <- dbGetQuery(con, sql)
-cat(ncol(rs), "columns")
+cat(ncol(rs), "column(s)")
 sql <- "select * from duckdb_indexes;"
 rs <- dbGetQuery(con, sql)
-cat(nrow(rs), "indexes")
+cat(nrow(rs), "index(es)")
 ```
 
 ## Count Respondents by Year
@@ -323,7 +324,8 @@ consumers %>% head()
 ```{r}
 ggplot(data=consumers, aes(x=Year, y=Prevalence, group=Factor, color=Factor)) + 
     geom_line() + facet_grid(Factor ~ Education, scales="free_y") +
-    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) + 
+    scale_color_manual(values = cbPalette)
 ```
 
 ## Compare other Variables
@@ -392,7 +394,72 @@ consumers <- consumers %>%
 # Use the same ggplot() command as before
 ggplot(data=consumers, aes(x=Year, y=Prevalence, group=Factor, color=Factor)) + 
     geom_line() + facet_grid(Factor ~ Education, scales="free_y") + 
-    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) + 
+    scale_color_manual(values = cbPalette)
+```
+
+## Comparing States
+
+We can easily compare states if we know the codes used in the BRFSS dataset. The
+codes are known as [FIPS codes](https://transition.fcc.gov/oet/info/maps/census/fips/fips.txt). We can 
+lookup the FIPS code for Pacific NW states like this:
+
+```{r}
+fips_fn <- file.path("data", "fips.txt")
+if (! file.exists(fips_fn)) {
+  url <- "https://transition.fcc.gov/oet/info/maps/census/fips/fips.txt"
+  download.file(url)
+}
+
+fips <- suppressMessages(read_fwf(fips_fn, skip = 16, n_max = 51)) %>% 
+  rename("state_fips" = X1, "state_name" = X2) %>% 
+  mutate(state_fips = as.numeric(state_fips)) %>%
+  mutate(state_name = str_to_title(state_name)) %>%
+  mutate(state_name = str_replace(state_name, " Of ", " of "))
+
+pnw_state_fips <- fips %>% 
+  filter(state_name %in% 
+           c("Alaska", "Idaho", "Montana", "Oregon", "Washington")) %>%
+  pull(state_fips)
+```
+
+Now we can use these codes to reproduce the previous plot but for multiple states.
+
+## Comparing States
+
+```{r}
+brfss_data <- tbl(con, "brfss")
+result <- brfss_data %>% 
+  rename("Year" = IYEAR, "Education" = `_EDUCAG`, State = `_STATE`) %>% 
+  select(Year, Education, State, USENOW3, DRNKANY5) %>%
+  filter(Year >= 2012, Year <= 2021, Education <= 4, State %in% pnw_state_fips)
+
+consumers <- result %>% collect() %>% 
+  mutate(Smoker = ifelse(USENOW3 %in% 1:2, 1, 0)) %>% 
+  mutate(Drinker = ifelse(DRNKANY5 == 1, 1, 0)) %>% 
+  group_by(Year, State, Education) %>% 
+  summarize(Respondents = n(), 
+            Smokers = sum(Smoker, na.rm = TRUE),
+            Drinkers = sum(Drinker, na.rm = TRUE),
+            .groups = "keep") %>% 
+  mutate(Smoking = Smokers/Respondents, 
+         Drinking = Drinkers/Respondents) %>%
+  mutate(Education = factor(Education, levels = 1:4, labels = edu.labels)) %>% 
+  select(Year, State, Education, Smoking, Drinking) %>% 
+  pivot_longer(c(-Year, -State, -Education), 
+               names_to = "Factor", values_to = "Prevalence") %>%
+  inner_join(fips, by = c('State' = 'state_fips')) %>% 
+  mutate(State = state_name) %>% select(-state_name)
+```
+
+## Comparing States
+
+```{r}
+# Use the same ggplot() command as before, modified to color by state
+ggplot(data=consumers, aes(x=Year, y=Prevalence, group=State, color=State)) + 
+    geom_line() + facet_grid(Factor ~ Education, scales="free_y") + 
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) + 
+    scale_color_manual(values = cbPalette)
 ```
 
 ## Speeding up Queries
@@ -459,10 +526,11 @@ consumers <- brfsswa1221 %>%
 ## Smoking and Drinking Prevalence
 
 ```{r}
-# Use the same ggplot() command as before
+# Use the same ggplot() command as used earlier
 ggplot(data=consumers, aes(x=Year, y=Prevalence, group=Factor, color=Factor)) + 
     geom_line() + facet_grid(Factor ~ Education, scales="free_y") + 
-    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) + 
+    scale_color_manual(values = cbPalette)
 ```
 
 ## Close Database Connection
