@@ -43,7 +43,7 @@ Load the required R packages, installing as needed.
 
 ```r
 if(!requireNamespace("pacman", quietly = TRUE)) install.packages("pacman")
-pacman::p_load(knitr, dplyr, ggplot2, tidyr, stringr, forcats, duckdb, readr)
+pacman::p_load(knitr, dplyr, ggplot2, tidyr, stringr, ggh4x, duckdb, readr)
 ```
 
 Set `knitr` rendering options, the number of digits to display, and a palette.
@@ -322,7 +322,7 @@ ORDER BY IYEAR, _EDUCAG DESC;"
 rs <- dbGetQuery(con, sql)
 tobacco_use <- rs %>% group_by(Year, Education) %>% 
   mutate(Smokers = Smokers/Respondents, 
-         `Chewers or Snuffers` = Chewers/Respondents) %>%
+         `Chewers and Snuffers` = Chewers/Respondents) %>%
   mutate(Education = factor(Education, levels = 1:4, labels = edu.labels),
          Year = factor(Year)) %>% 
   select(-Respondents, -Chewers) %>%
@@ -334,8 +334,8 @@ tobacco_use <- rs %>% group_by(Year, Education) %>%
 
 ```r
 ggplot(tobacco_use, aes(x = Year, y = Prevalence, 
-                        color = Education, group = Education)) +
-  geom_line() + facet_grid(. ~ Type) + 
+                        color = Education, group = Education)) + geom_line() + 
+  ggh4x::facet_grid2(. ~ Type, scales = "free_y", independent = "y") + 
   theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
 ```
 
@@ -467,7 +467,7 @@ drinkers <- rs %>% group_by(Year, Education) %>%
          `Binge Drinkers` = 
            BingeDrinkers/sum(BingeDrinkers, NonBingeDrinkers, na.rm = TRUE),
          Education = factor(Education, levels = 1:4, labels = edu.labels)) %>% 
-  select(-Respondents, -NonDrinkers, -BingeDrinkers, -NonBingeDrinkers) %>%
+  select(Year, Education, Drinkers, `Binge Drinkers`) %>%
   pivot_longer(c(-Year, -Education), names_to = "Type", values_to = "Prevalence")
 ```
 
@@ -476,8 +476,8 @@ drinkers <- rs %>% group_by(Year, Education) %>%
 
 ```r
 ggplot(drinkers, aes(x = Year, y = Prevalence, 
-                     color = Education, group = Education)) +
-  geom_line() + facet_grid(. ~ Type) + 
+                     color = Education, group = Education)) + geom_line() + 
+  ggh4x::facet_grid2(. ~ Type, scales = "free_y", independent = "y") +  
   theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
 ```
 
@@ -582,10 +582,15 @@ code instead if SQL to get your data from the database.
 ```r
 brfss_data <- tbl(con, "brfss")
 result <- brfss_data %>% 
-  rename("Year" = IYEAR, "Education" = `_EDUCAG`, State = `_STATE`) %>% 
-  select(Year, Education, State, SMOKDAY2, DRNKANY5) %>%
+  select("Year" = IYEAR, "Education" = `_EDUCAG`, State = `_STATE`, 
+         SMOKDAY2, DRNKANY5) %>%
   filter(Year >= 2012, Year <= 2021, State == 53, Education <= 4)
 ```
+
+Don't do too much cleanup here, though. Just focus on selecting and filtering
+the data to minimize how much to read from the database. Cleanup comes later. 
+The reason is that complex `dbplyr` queries can be slow and are more prone to 
+error.
 
 ## View the SQL Query
 
@@ -713,8 +718,8 @@ We can test our subset by reproducing our SQL query with R commands as before.
 
 ```r
 consumers <- brfsswa1221 %>%
-  rename("Year" = IYEAR, "Education" = `_EDUCAG`, State = `_STATE`) %>% 
-  select(Year, Education, State, SMOKDAY2, DRNKANY5) %>%
+  select("Year" = IYEAR, "Education" = `_EDUCAG`, State = `_STATE`, 
+         SMOKDAY2, DRNKANY5) %>%
   filter(Year >= 2012, Year <= 2021, State == 53, Education <= 4) %>% 
   mutate(Smoker = ifelse(SMOKDAY2 %in% 1:2, 1, 0)) %>% 
   mutate(NonSmoker = ifelse(SMOKDAY2 == 3, 1, 0)) %>% 
@@ -806,8 +811,8 @@ inner_join(fips, collect(result), by = c('state_fips' = 'State'))
 brfss_data <- tbl(con, "brfss")
 
 result <- brfss_data %>% 
-  rename("Year" = IYEAR, "Education" = `_EDUCAG`, State = `_STATE`) %>% 
-  select(Year, Education, State, SMOKDAY2, DRNKANY5) %>%
+  select("Year" = IYEAR, "Education" = `_EDUCAG`, State = `_STATE`, 
+         SMOKDAY2, DRNKANY5) %>%
   filter(Year >= 2012, Year <= 2021, Education <= 4, State %in% pnw_state_fips)
 
 consumers <- collect(result) %>% 
@@ -848,10 +853,10 @@ Age group (`_AGE_G`) is a 6-level ordinal variable. Apply labels with `factor()`
 ```r
 age.labels <- c('18-24', '25-34', '35-44', '45-54', '55-64', '65+')
 consumers <- tbl(con, "brfss") %>% 
-  rename("Year" = IYEAR, "Age Group" = `_AGE_G`, State = `_STATE`) %>% 
-  select(Year, `Age Group`, State, SMOKDAY2, DRNKANY5) %>%
+  select("Year" = IYEAR, "Age Group" = `_AGE_G`, State = `_STATE`, 
+         SMOKDAY2, DRNKANY5) %>%
   filter(Year >= 2012, Year <= 2021, State %in% pnw_state_fips) %>% 
-  collect(result) %>% 
+  collect() %>% 
   mutate(Smoker = ifelse(SMOKDAY2 %in% 1:2, 1, 0)) %>% 
   mutate(NonSmoker = ifelse(SMOKDAY2 == 3, 1, 0)) %>% 
   mutate(Drinker = ifelse(DRNKANY5 == 1, 1, 0)) %>% 
@@ -874,8 +879,8 @@ Plot drinking and smoking prevalence by age group and state for 2012-2021.
 
 
 ```r
-ggplot(consumers, aes(x = `Age Group`, y = Prevalence, 
-                      group = State, color = State)) + 
+ggplot(consumers, 
+       aes(x = `Age Group`, y = Prevalence, group = State, color = State)) + 
   geom_line() + facet_grid(. ~ Factor)
 ```
 
