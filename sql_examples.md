@@ -43,14 +43,14 @@ Load the required R packages, installing as needed.
 
 ```r
 if(!requireNamespace("pacman", quietly = TRUE)) install.packages("pacman")
-pacman::p_load(knitr, dplyr, ggplot2, tidyr, stringr, duckdb, readr)
+pacman::p_load(knitr, dplyr, ggplot2, tidyr, stringr, forcats, duckdb, readr)
 ```
 
 Set `knitr` rendering options, the number of digits to display, and a palette.
 
 
 ```r
-opts_chunk$set(tidy=FALSE, cache=FALSE)
+opts_chunk$set(tidy=FALSE, cache=FALSE, fig.height=3.5)
 options(digits=4)
 cbPalette <- c("#CC79A7", "#D55E00", "#999999", "#0072B2", "#009E73")
 ```
@@ -417,7 +417,7 @@ ORDER BY IYEAR, _EDUCAG DESC;"
 rs <- dbGetQuery(con, sql)
 drinkers <- rs %>% group_by(Year, Education) %>% 
     mutate(`Drinking Prevalence` = 
-             Drinkers/sum(Drinkers, NonDrinkers, na.rm = TRUE),
+           Drinkers/sum(Drinkers, NonDrinkers, na.rm = TRUE),
            Education = factor(Education, levels = 1:4, labels = edu.labels))
 ```
 
@@ -840,12 +840,53 @@ ggplot(consumers, aes(x = Year, y = Prevalence, group = State, color = State)) +
 
 ![](sql_examples_files/figure-html/unnamed-chunk-38-1.png)<!-- -->
 
+## Smoking and Drinking by State and Age
+
+Age group (`_AGE_G`) is a 6-level ordinal variable. Apply labels with `factor()`.
+
+
+```r
+age.labels <- c('18-24', '25-34', '35-44', '45-54', '55-64', '65+')
+consumers <- tbl(con, "brfss") %>% 
+  rename("Year" = IYEAR, "Age Group" = `_AGE_G`, State = `_STATE`) %>% 
+  select(Year, `Age Group`, State, SMOKDAY2, DRNKANY5) %>%
+  filter(Year >= 2012, Year <= 2021, State %in% pnw_state_fips) %>% 
+  collect(result) %>% 
+  mutate(Smoker = ifelse(SMOKDAY2 %in% 1:2, 1, 0)) %>% 
+  mutate(NonSmoker = ifelse(SMOKDAY2 == 3, 1, 0)) %>% 
+  mutate(Drinker = ifelse(DRNKANY5 == 1, 1, 0)) %>% 
+  mutate(NonDrinker = ifelse(DRNKANY5 == 2, 1, 0)) %>% 
+  group_by(State, `Age Group`) %>% 
+  summarize(
+    Smoking = sum(Smoker, na.rm = TRUE)/sum(Smoker, NonSmoker, na.rm = TRUE),
+    Drinking = sum(Drinker, na.rm = TRUE)/sum(Drinker, NonDrinker, na.rm = TRUE),
+    .groups = "keep") %>% 
+  pivot_longer(c(Smoking, Drinking), 
+               names_to = "Factor", values_to = "Prevalence") %>%
+  inner_join(fips, by = c('State' = 'state_fips')) %>% 
+  mutate(State = state_name) %>% select(-state_name) %>%
+  mutate(`Age Group` = factor(`Age Group`, levels = 1:6, labels = age.labels))
+```
+
+## Smoking and Drinking by State and Age
+
+Plot drinking and smoking prevalence by age group and state for 2012-2021.
+
+
+```r
+ggplot(consumers, aes(x = `Age Group`, y = Prevalence, 
+                      group = State, color = State)) + 
+  geom_line() + facet_grid(. ~ Factor)
+```
+
+![](sql_examples_files/figure-html/unnamed-chunk-40-1.png)<!-- -->
+
 ## Compare other Variables
 
 Now that you know how to query the database, compare other variables, such as:
 
 - Smoking and drinking by income (`_INCOMG`) or race (`_RACE`)
-- Smoking and drinking by gender (`SEX`) or age (`_AGE80`)
+- Smoking and drinking by cholesterol (`_RFCHOL3`) or heart disease (`_MICHD`) 
 - BMI category (`_BMI5CAT`) and exercise (`EXERANY2`) or sleep (`SLEPTIM1`)
 - Health care access (`HLTHPLN1`) and household income (`INCOME2`)
 - Stress (`QLSTRES2`) and marital status (`MARITAL`)
