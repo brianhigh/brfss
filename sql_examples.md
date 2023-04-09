@@ -43,7 +43,7 @@ Load the required R packages, installing as needed.
 
 ```r
 if(!requireNamespace("pacman", quietly = TRUE)) install.packages("pacman")
-pacman::p_load(knitr, dplyr, ggplot2, tidyr, stringr, ggh4x, duckdb, readr)
+pacman::p_load(knitr, dplyr, ggplot2, tidyr, stringr, ggh4x, duckdb, readr, httr)
 ```
 
 Set `knitr` rendering options, the number of digits to display, and a palette.
@@ -702,7 +702,7 @@ ggplot(consumers, aes(x = Year, y = Prevalence, group = Factor, color = Factor))
 ## Compare States: FIPS Codes
 
 We can easily compare states if we know the codes used in the BRFSS dataset. The
-codes are known as [FIPS codes](https://transition.fcc.gov/oet/info/maps/census/fips/fips.txt). We can 
+codes are known as [FIPS codes](https://www.cdc.gov/brfss/annual_data/1996/files/fipscode.txt). We can 
 lookup the FIPS code for Pacific Northwest (PNW) states like this:
 
 
@@ -710,7 +710,11 @@ lookup the FIPS code for Pacific Northwest (PNW) states like this:
 # Get a table of state FIPS codes and state names
 fips_fn <- file.path("data", "fips.txt")
 url <- "https://www.cdc.gov/brfss/annual_data/1996/files/fipscode.txt"
-if (! file.exists(fips_fn)) download.file(url, fips_fn)
+if (! file.exists(fips_fn)) {
+  # Convert CRLF to LF before writing file
+  GET(url) %>% content("text", encoding = "UTF-8") %>% 
+  str_replace_all('\\r\\n', '\n') %>% write(fips_fn)
+}
 
 # Import and cleanup data
 fips <- read_fwf(fips_fn, skip = 3, n_max = 51, col_types = c("i", "c"), 
