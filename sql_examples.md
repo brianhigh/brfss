@@ -699,7 +699,7 @@ ggplot(consumers, aes(x = Year, y = Prevalence, group = Factor, color = Factor))
 
 ![](sql_examples_files/figure-html/unnamed-chunk-32-1.png)<!-- -->
 
-## Compare States: FIPS Codes
+## Compare States: Get FIPS Codes
 
 We can easily compare states if we know the codes used in the BRFSS dataset. The
 codes are known as [FIPS codes](https://www.cdc.gov/brfss/annual_data/1996/files/fipscode.txt). We can 
@@ -872,7 +872,6 @@ Resource temporarily unavailable
 ### Write-Ahead-Log (`.wal`) Files
 
 If you close your R session without first closing the connection, a `.wal` file 
-may be left behind, preventing new connections. This file represents a "lock" 
-on the database. The lock is considered "stale" if the process that created it 
-has ended but the file remains. This file can be removed manually, if absolutely 
-necessary.
+may be left behind, preventing new connections. In that case, you could remove 
+this file manually. Otherwise, R will cleanup that file for you after you close 
+your connection with `dbDisconnect()`.
