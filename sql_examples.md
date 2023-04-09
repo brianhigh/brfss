@@ -708,22 +708,21 @@ lookup the FIPS code for Pacific Northwest (PNW) states like this:
 
 ```r
 # Get a table of state FIPS codes and state names
-fips_fn <- file.path("data", "fips.txt")
-url <- "https://www.cdc.gov/brfss/annual_data/1996/files/fipscode.txt"
+fips_fn <- file.path("data", "fips.csv")
 if (! file.exists(fips_fn)) {
-  # Convert CRLF to LF before writing file
+  url <- "https://www.cdc.gov/brfss/annual_data/1996/files/fipscode.txt"
   GET(url) %>% content("text", encoding = "UTF-8") %>% 
-  str_replace_all('\\r\\n', '\n') %>% write(fips_fn)
+    str_replace_all('\\r\\n', '\n') %>% 
+    read_fwf(skip = 3, n_max = 51, col_types = c("i", "c"), 
+                 col_positions = fwf_widths(c(12, NA))) %>%
+    rename("state_fips" = X1, "state_name" = X2) %>% 
+    mutate(state_name = str_to_title(state_name)) %>%
+    mutate(state_name = str_replace(state_name, " Of ", " of ")) %>% 
+    write_csv(fips_fn)
 }
 
-# Import and cleanup data
-fips <- read_fwf(fips_fn, skip = 3, n_max = 51, col_types = c("i", "c"), 
-                 col_positions = fwf_widths(c(12, NA))) %>% 
-  rename("state_fips" = X1, "state_name" = X2) %>% 
-  mutate(state_name = str_to_title(state_name)) %>%
-  mutate(state_name = str_replace(state_name, " Of ", " of "))
-
-# Create a vector of PNW state FIPS codes to use for filtering
+# Import data and create a vector of PNW state FIPS codes to use for filtering
+fips <- read_csv(fips_fn, col_types = c('i', 'c'))
 pnw_states <- c("Alaska", "Idaho", "Montana", "Oregon", "Washington")
 pnw_state_fips <- fips %>% filter(state_name %in% pnw_states) %>% pull(state_fips)
 ```
