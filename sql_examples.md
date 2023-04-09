@@ -166,7 +166,7 @@ sql <- "SELECT _EDUCAG AS Education,
 COUNT(SMOKDAY2) AS Smokers 
 FROM brfss 
 WHERE IYEAR = 2021 AND _STATE = 53 AND _EDUCAG <= 4 
-AND (SMOKDAY2 = 1 OR SMOKDAY2 = 2) 
+AND (SMOKDAY2 IN (1, 2)) 
 GROUP BY _EDUCAG 
 ORDER BY _EDUCAG;"
 dbGetQuery(con, sql)
@@ -192,7 +192,7 @@ query by using the `IF()` function within the `COUNT()` function.
 ```r
 sql <- "SELECT _EDUCAG AS Education, 
 COUNT(*) AS Respondents, 
-COUNT(IF(SMOKDAY2 = 1 OR SMOKDAY2 = 2, 1, NULL)) AS Smokers 
+COUNT(IF(SMOKDAY2 IN (1, 2), 1, NULL)) AS Smokers 
 FROM brfss 
 WHERE IYEAR = 2021 AND _STATE = 53 AND _EDUCAG <= 4 
 GROUP BY _EDUCAG 
@@ -209,7 +209,7 @@ rs
 ## 4         4        5884     242
 ```
 
-The `IF()` condition `SMOKDAY2 = 1 OR SMOKDAY2 = 2` was taken from the `WHERE` 
+The `IF()` condition `SMOKDAY2 IN (1, 2)` was taken from the `WHERE` 
 clause. We had to make this change so that `COUNT(*)` counts all respondents.
 
 ## Smoking Prevalence by Education Level
@@ -276,7 +276,7 @@ calculation to exclude the "Don't Know/Refused/Missing" responses from the denom
 
 ```r
 sql <- "SELECT IYEAR AS Year, _EDUCAG AS Education, 
-COUNT(IF(SMOKDAY2 = 1 OR SMOKDAY2 = 2, 1, NULL)) AS Smokers, 
+COUNT(IF(SMOKDAY2 IN (1, 2), 1, NULL)) AS Smokers, 
 COUNT(IF(SMOKDAY2 = 3, 1, NULL)) AS NonSmokers 
 FROM brfss 
 WHERE (IYEAR BETWEEN 2012 AND 2021)
@@ -310,7 +310,7 @@ ggplot(smokers, aes(x = Year, y = `Smoking Prevalence`,
 ```r
 sql <- "SELECT IYEAR AS Year, _EDUCAG AS Education, 
 COUNT(*) AS Respondents, 
-COUNT(IF(SMOKDAY2 = 1 OR SMOKDAY2 = 2, 1, NULL)) AS Smokers,
+COUNT(IF(SMOKDAY2 IN (1, 2), 1, NULL)) AS Smokers,
 COUNT(IF(USENOW3 = 1 OR USENOW3 = 2, 1, NULL)) AS Chewers
 FROM brfss 
 WHERE (IYEAR BETWEEN 2012 AND 2021)
@@ -483,79 +483,30 @@ ggplot(drinkers, aes(x = Year, y = Prevalence,
 
 ![](sql_examples_files/figure-html/unnamed-chunk-22-1.png)<!-- -->
 
-## Why so many queries?
+## Smoking and Drinking Prevalence
 
-We can retrieve the smoking and drinking data with a single query:
+Prepare prevalence data as before, but reshape to allow faceting by risk factor.
 
 
 ```r
 sql <- "SELECT IYEAR AS Year, _EDUCAG AS Education, 
-COUNT(IF(SMOKDAY2 = 1 OR SMOKDAY2 = 2, 1, NULL)) AS Smokers, 
+COUNT(IF(SMOKDAY2 IN (1, 2), 1, NULL)) AS Smokers, 
 COUNT(IF(SMOKDAY2 = 3, 1, NULL)) AS NonSmokers,
 COUNT(IF(DRNKANY5 = 1, 1, NULL)) AS Drinkers,
 COUNT(IF(DRNKANY5 = 2, 1, NULL)) AS NonDrinkers
 FROM brfss 
-WHERE (IYEAR BETWEEN 2012 AND 2021)
-AND _STATE = 53 
-AND _EDUCAG <= 4 
+WHERE (IYEAR BETWEEN 2012 AND 2021) AND _STATE = 53 AND _EDUCAG <= 4 
 GROUP BY IYEAR, _EDUCAG 
 ORDER BY IYEAR, _EDUCAG;"
 
-rs <- dbGetQuery(con, sql)
-consumers <- rs %>% group_by(Year, Education) %>% 
+consumers <- dbGetQuery(con, sql) %>% 
+  group_by(Year, Education) %>% 
   mutate(Smoking = Smokers/sum(Smokers, NonSmokers, na.rm = TRUE), 
          Drinking = Drinkers/sum(NonDrinkers, NonDrinkers, na.rm = TRUE),
          Education = factor(Education, levels = 1:4, labels = edu.labels)) %>%
-  select(Year, Education, Smoking, Drinking)
-```
-
-From this dataframe, just subset as needed to produce tables and plots.
-
-## Smoking and Drinking Prevalence
-
-
-```r
-consumers %>% head()
-```
-
-```
-## # A tibble: 6 × 4
-## # Groups:   Year, Education [6]
-##   Year  Education        Smoking Drinking
-##   <chr> <fct>              <dbl>    <dbl>
-## 1 2012  some school        0.476    0.266
-## 2 2012  high school grad   0.382    0.486
-## 3 2012  some college       0.316    0.685
-## 4 2012  college grad       0.173    1.15 
-## 5 2013  some school        0.510    0.263
-## 6 2013  high school grad   0.357    0.487
-```
-
-## Smoking and Drinking in Long Format
-
-To facilitate plotting, we will want to group by consumption type. To do this,
-we will need to convert the data structure from "wide" to "long" format. The
-`pivot_longer()` function of the `tidyr` package makes this easy.
-
-
-```r
-consumers <- consumers %>% 
+  select(Year, Education, Smoking, Drinking) %>%
   pivot_longer(c(Smoking, Drinking), 
                names_to = "Factor", values_to = "Prevalence")
-consumers %>% head()
-```
-
-```
-## # A tibble: 6 × 4
-## # Groups:   Year, Education [3]
-##   Year  Education        Factor   Prevalence
-##   <chr> <fct>            <chr>         <dbl>
-## 1 2012  some school      Smoking       0.476
-## 2 2012  some school      Drinking      0.266
-## 3 2012  high school grad Smoking       0.382
-## 4 2012  high school grad Drinking      0.486
-## 5 2012  some college     Smoking       0.316
-## 6 2012  some college     Drinking      0.685
 ```
 
 ## Smoking and Drinking Prevalence
@@ -568,7 +519,7 @@ ggplot(consumers, aes(x = Year, y = Prevalence, group = Factor, color = Factor))
     scale_color_manual(values = cbPalette)
 ```
 
-![](sql_examples_files/figure-html/unnamed-chunk-26-1.png)<!-- -->
+![](sql_examples_files/figure-html/unnamed-chunk-24-1.png)<!-- -->
 
 ## Alternative to Writing SQL
 
@@ -650,7 +601,7 @@ ggplot(consumers, aes(x = Year, y = Prevalence, group = Factor, color = Factor))
     scale_color_manual(values = cbPalette)
 ```
 
-![](sql_examples_files/figure-html/unnamed-chunk-30-1.png)<!-- -->
+![](sql_examples_files/figure-html/unnamed-chunk-28-1.png)<!-- -->
 
 ## Speeding up Queries
 
@@ -746,7 +697,7 @@ ggplot(consumers, aes(x = Year, y = Prevalence, group = Factor, color = Factor))
     scale_color_manual(values = cbPalette)
 ```
 
-![](sql_examples_files/figure-html/unnamed-chunk-34-1.png)<!-- -->
+![](sql_examples_files/figure-html/unnamed-chunk-32-1.png)<!-- -->
 
 ## Compare States: FIPS Codes
 
@@ -764,7 +715,8 @@ if (! file.exists(fips_fn)) {
 }
 
 # Cleanup data
-fips <- suppressMessages(read_fwf(fips_fn, skip = 3, n_max = 51)) %>% 
+fips <- read_fwf(fips_fn, skip = 3, n_max = 51, col_types = c("i", "c"), 
+                 col_positions = fwf_widths(c(12, NA))) %>% 
   rename("state_fips" = X1, "state_name" = X2) %>% 
   mutate(state_fips = as.numeric(state_fips)) %>%
   mutate(state_name = str_to_title(state_name)) %>%
@@ -843,7 +795,7 @@ ggplot(consumers, aes(x = Year, y = Prevalence, group = State, color = State)) +
     scale_color_manual(values = cbPalette)
 ```
 
-![](sql_examples_files/figure-html/unnamed-chunk-38-1.png)<!-- -->
+![](sql_examples_files/figure-html/unnamed-chunk-36-1.png)<!-- -->
 
 ## Smoking and Drinking by State and Age
 
@@ -884,7 +836,7 @@ ggplot(consumers,
   geom_line() + facet_grid(. ~ Factor)
 ```
 
-![](sql_examples_files/figure-html/unnamed-chunk-40-1.png)<!-- -->
+![](sql_examples_files/figure-html/unnamed-chunk-38-1.png)<!-- -->
 
 ## Compare other Variables
 
