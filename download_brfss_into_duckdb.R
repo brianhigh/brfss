@@ -84,5 +84,8 @@ toc()
 # Create index for improved performance and to prevent duplication
 result <- create_index(c("SEQNO", "_STATE", "IYEAR"), uniq = TRUE, con = con)
 
+# Import data for 2021 as a separate table to get the latest set of variables
+result <- map(2021, store_data, con = con, tbl_name = "brfss2021")
+
 # Close database connection
 dbDisconnect(con, shutdown = TRUE)

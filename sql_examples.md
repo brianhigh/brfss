@@ -22,7 +22,8 @@ editor_options:
 ## SQL Examples: Smoking and Drinking
 
 This is a demo of some basic SQL `SELECT` queries using BRFSS data from: 
-http://www.cdc.gov/brfss/. 
+http://www.cdc.gov/brfss/. We will also demonstrate use of `dbplyr` to perform 
+queries for us, without our having to code the SQL statements ourselves.
 
 We have downloaded the data for each respondent for the years 2012 through 2021. This dataset has 4,506,254 rows and 840 columns when [combined into a dataframe](get-brfss-data.md).
 
@@ -341,6 +342,59 @@ ggplot(tobacco_use, aes(x = Year, y = Prevalence,
 
 ![](sql_examples_files/figure-html/unnamed-chunk-14-1.png)<!-- -->
 
+## Smoking and Vaping in 2021
+
+We will compare the proportion of smokers (`SMOKDAY2`) and e-cigarette (`ECIGNOW1`) 
+or other electronic vaping product users ("vapers"), and those who are both, by 
+age group for 2021. 
+
+Since `ECIGNOW1` is not available for previous years, and is not present in our
+database's "brfss" table, we will use a different table (`brfss2021`) that was 
+made by importing just the 2021 dataset from the BRFSS website.
+
+
+```r
+sql <- 'SELECT _AGE_G as "Age Group", 
+COUNT(*) AS Respondents, 
+COUNT(IF(SMOKDAY2 IN (1, 2), 1, NULL)) AS Smokers,
+COUNT(IF(ECIGNOW1 IN (1, 2), 1, NULL)) AS Vapers, 
+COUNT(IF((SMOKDAY2 IN (1, 2)) AND (ECIGNOW1 IN (1, 2)), 1, NULL)) AS SmokeAndVapers, 
+FROM brfss2021 WHERE IYEAR = 2021 
+GROUP BY _AGE_G ORDER BY _AGE_G;'
+
+rs <- dbGetQuery(con, sql)
+```
+
+## Smoking and Vaping in 2021
+
+Age group (`_AGE_G`) is a 6-level ordinal variable. Apply labels with `factor()`. 
+
+The pivot longer to store `Smoke`, `Vape`,and `Smoke and Vape` in `Factor` with 
+values in `Prevalance`. This allows plotting by Factor in different colors.
+
+
+```r
+age.labels <- c('18-24', '25-34', '35-44', '45-54', '55-64', '65+')
+consumers <- rs %>% group_by(`Age Group`) %>%
+  mutate(`Smoke` = Smokers/Respondents,
+         `Vape` = Vapers/Respondents,
+         `Smoke and Vape` = SmokeAndVapers/Respondents,
+         `Age Group` = factor(`Age Group`, levels = 1:6, labels = age.labels)) %>%
+    pivot_longer(c(`Smoke`, `Vape`, `Smoke and Vape`), 
+                 names_to = "Factor", values_to = "Prevalence")
+```
+
+## Smoking and Vaping in 2021
+
+
+```r
+ggplot(consumers, aes(x = `Age Group`, y = `Prevalence`, 
+                    color = Factor, group = Factor)) + 
+  geom_line(linewidth = 1.5) + scale_color_manual(values = cbPalette)
+```
+
+![](sql_examples_files/figure-html/unnamed-chunk-17-1.png)<!-- -->
+
 ## Count Drinkers by Education Level
 
 The `DRNKANY5` variable stores a value indicating if the survey respondent has 
@@ -394,7 +448,7 @@ ggplot(drinkers, aes(x = Education, y = `Drinking Prevalence`, fill = Education)
   geom_bar(stat = "identity")
 ```
 
-![](sql_examples_files/figure-html/unnamed-chunk-17-1.png)<!-- -->
+![](sql_examples_files/figure-html/unnamed-chunk-20-1.png)<!-- -->
 
 ## Count Drinkers by Education and Year
 
@@ -429,7 +483,7 @@ ggplot(drinkers, aes(x = Year, y = `Drinking Prevalence`,
                      color = Education, group = Education)) + geom_line()
 ```
 
-![](sql_examples_files/figure-html/unnamed-chunk-19-1.png)<!-- -->
+![](sql_examples_files/figure-html/unnamed-chunk-22-1.png)<!-- -->
 
 ## Drinkers and Binge Drinkers
 
@@ -481,7 +535,7 @@ ggplot(drinkers, aes(x = Year, y = Prevalence,
   theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
 ```
 
-![](sql_examples_files/figure-html/unnamed-chunk-22-1.png)<!-- -->
+![](sql_examples_files/figure-html/unnamed-chunk-25-1.png)<!-- -->
 
 ## Smoking and Drinking Prevalence
 
@@ -519,7 +573,7 @@ ggplot(consumers, aes(x = Year, y = Prevalence, group = Factor, color = Factor))
     scale_color_manual(values = cbPalette)
 ```
 
-![](sql_examples_files/figure-html/unnamed-chunk-24-1.png)<!-- -->
+![](sql_examples_files/figure-html/unnamed-chunk-27-1.png)<!-- -->
 
 ## Alternative to Writing SQL
 
@@ -601,7 +655,7 @@ ggplot(consumers, aes(x = Year, y = Prevalence, group = Factor, color = Factor))
     scale_color_manual(values = cbPalette)
 ```
 
-![](sql_examples_files/figure-html/unnamed-chunk-28-1.png)<!-- -->
+![](sql_examples_files/figure-html/unnamed-chunk-31-1.png)<!-- -->
 
 ## Speeding up Queries
 
@@ -697,7 +751,7 @@ ggplot(consumers, aes(x = Year, y = Prevalence, group = Factor, color = Factor))
     scale_color_manual(values = cbPalette)
 ```
 
-![](sql_examples_files/figure-html/unnamed-chunk-32-1.png)<!-- -->
+![](sql_examples_files/figure-html/unnamed-chunk-35-1.png)<!-- -->
 
 ## Compare States: Get FIPS Codes
 
@@ -793,7 +847,7 @@ ggplot(consumers, aes(x = Year, y = Prevalence, group = State, color = State)) +
     scale_color_manual(values = cbPalette)
 ```
 
-![](sql_examples_files/figure-html/unnamed-chunk-36-1.png)<!-- -->
+![](sql_examples_files/figure-html/unnamed-chunk-39-1.png)<!-- -->
 
 ## Smoking and Drinking by State and Age
 
@@ -834,14 +888,14 @@ ggplot(consumers,
   geom_line() + facet_grid(. ~ Factor)
 ```
 
-![](sql_examples_files/figure-html/unnamed-chunk-38-1.png)<!-- -->
+![](sql_examples_files/figure-html/unnamed-chunk-41-1.png)<!-- -->
 
 ## Compare other Variables
 
 Now that you know how to query the database, compare other variables, such as:
 
-- Smoking and drinking by income (`_INCOMG`) or race (`_RACE`)
-- Smoking and drinking by cholesterol (`_RFCHOL3`) or heart disease (`_MICHD`) 
+- Smoking and drinking with income (`_INCOMG`) or race (`_RACE`)
+- Smoking and drinking with cholesterol (`_RFCHOL3`) or heart disease (`_MICHD`) 
 - BMI category (`_BMI5CAT`) and exercise (`EXERANY2`) or sleep (`SLEPTIM1`)
 - Health care access (`HLTHPLN1`) and household income (`INCOME2`)
 - Stress (`QLSTRES2`) and marital status (`MARITAL`)
