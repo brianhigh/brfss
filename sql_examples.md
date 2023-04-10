@@ -367,10 +367,10 @@ rs <- dbGetQuery(con, sql)
 
 ## 2021 Smoking & Vaping by Age & Sex
 
-`_AGE_G` and `BIRTHSEX` are categorical variables. Apply labels with `factor()`. 
+Variables `_AGE_G` and `BIRTHSEX` are categorical, so apply labels with `factor()`. 
 
-The pivot longer to store `Smoke`, `Vape`,and `Smoke and Vape` in `Factor` with 
-values in `Prevalance`. This allows plotting by Factor in different colors.
+Reshape using `pivot_longer()` to store `Smoke`, `Vape`,and `Smoke and Vape` in `Factor` 
+with values in `Prevalance`. This allows plotting by Factor in different colors.
 
 
 ```r
