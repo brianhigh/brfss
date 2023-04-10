@@ -342,7 +342,7 @@ ggplot(tobacco_use, aes(x = Year, y = Prevalence,
 
 ![](sql_examples_files/figure-html/unnamed-chunk-14-1.png)<!-- -->
 
-## Smoking and Vaping in 2021
+## Smoking and Vaping by Age in 2021
 
 We will compare the proportion of smokers (`SMOKDAY2`) and e-cigarette (`ECIGNOW1`) 
 or other electronic vaping product users ("vapers"), and those who are both, by 
@@ -365,7 +365,7 @@ GROUP BY _AGE_G ORDER BY _AGE_G;'
 rs <- dbGetQuery(con, sql)
 ```
 
-## Smoking and Vaping in 2021
+## Smoking and Vaping by Age in 2021
 
 Age group (`_AGE_G`) is a 6-level ordinal variable. Apply labels with `factor()`. 
 
@@ -378,13 +378,14 @@ age.labels <- c('18-24', '25-34', '35-44', '45-54', '55-64', '65+')
 consumers <- rs %>% group_by(`Age Group`) %>%
   mutate(`Smoke` = Smokers/Respondents,
          `Vape` = Vapers/Respondents,
+         `Smoke or Vape` = sum(Smokers, Vapers, na.rm = TRUE)/Respondents,
          `Smoke and Vape` = SmokeAndVapers/Respondents,
          `Age Group` = factor(`Age Group`, levels = 1:6, labels = age.labels)) %>%
-    pivot_longer(c(`Smoke`, `Vape`, `Smoke and Vape`), 
+    pivot_longer(c(`Smoke`, `Vape`, `Smoke or Vape`, `Smoke and Vape`), 
                  names_to = "Factor", values_to = "Prevalence")
 ```
 
-## Smoking and Vaping in 2021
+## Smoking and Vaping by Age in 2021
 
 
 ```r
@@ -556,7 +557,7 @@ ORDER BY IYEAR, _EDUCAG;"
 consumers <- dbGetQuery(con, sql) %>% 
   group_by(Year, Education) %>% 
   mutate(Smoking = Smokers/sum(Smokers, NonSmokers, na.rm = TRUE), 
-         Drinking = Drinkers/sum(NonDrinkers, NonDrinkers, na.rm = TRUE),
+         Drinking = Drinkers/sum(Drinkers, NonDrinkers, na.rm = TRUE),
          Education = factor(Education, levels = 1:4, labels = edu.labels)) %>%
   select(Year, Education, Smoking, Drinking) %>%
   pivot_longer(c(Smoking, Drinking), 
