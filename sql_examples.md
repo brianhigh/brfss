@@ -675,10 +675,10 @@ drinkers <- tbl(con, "brfss2021") %>%
   mutate(DaysPerMonth = 
            case_when(ALCDAY5 >= 101 & ALCDAY5 <= 107 ~ (ALCDAY5 - 100) * (30/7),
                      ALCDAY5 >= 201 & ALCDAY5 <= 230 ~ ALCDAY5 - 200,
-                     .default = 0)) %>% 
+                     .default = NA)) %>% 
   mutate(DrinksPerDay = 
            case_when(AVEDRNK3 >= 1 & AVEDRNK3 <= 76 ~ AVEDRNK3,
-                     .default = 0)) %>% 
+                     .default = NA)) %>% 
   mutate(DrinksPerMonth = DrinksPerDay * DaysPerMonth) %>% 
   group_by(Gender, `Age Group`) %>% 
   summarize(across(c(DrinksPerDay, DrinksPerMonth), ~ mean(.x, na.rm = TRUE)),
