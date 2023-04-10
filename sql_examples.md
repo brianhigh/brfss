@@ -342,11 +342,11 @@ ggplot(tobacco_use, aes(x = Year, y = Prevalence,
 
 ![](sql_examples_files/figure-html/unnamed-chunk-14-1.png)<!-- -->
 
-## Smoking and Vaping by Age in 2021
+## 2021 Smoking & Vaping by Age & Sex
 
 We will compare the proportion of smokers (`SMOKDAY2`) and e-cigarette (`ECIGNOW1`) 
 or other electronic vaping product users ("vapers"), and those who are both, by 
-age group for 2021. 
+age group (`_AGE_G`) and birth sex (`BIRTHSEX`) for 2021. 
 
 Since `ECIGNOW1` is not available for previous years, and is not present in our
 database's "brfss" table, we will use a different table (`brfss2021`) that was 
@@ -354,20 +354,20 @@ made by importing just the 2021 dataset from the BRFSS website.
 
 
 ```r
-sql <- 'SELECT _AGE_G as "Age Group", 
+sql <- 'SELECT _AGE_G AS "Age Group", BIRTHSEX AS Gender, 
 COUNT(*) AS Respondents, 
 COUNT(IF(SMOKDAY2 IN (1, 2), 1, NULL)) AS Smokers,
 COUNT(IF(ECIGNOW1 IN (1, 2), 1, NULL)) AS Vapers, 
 COUNT(IF((SMOKDAY2 IN (1, 2)) AND (ECIGNOW1 IN (1, 2)), 1, NULL)) AS SmokeAndVapers, 
-FROM brfss2021 WHERE IYEAR = 2021 
-GROUP BY _AGE_G ORDER BY _AGE_G;'
+FROM brfss2021 WHERE IYEAR = 2021 AND (Gender IN (1, 2)) 
+GROUP BY _AGE_G, BIRTHSEX ORDER BY _AGE_G, BIRTHSEX;'
 
 rs <- dbGetQuery(con, sql)
 ```
 
-## Smoking and Vaping by Age in 2021
+## 2021 Smoking & Vaping by Age & Sex
 
-Age group (`_AGE_G`) is a 6-level ordinal variable. Apply labels with `factor()`. 
+`_AGE_G` and `BIRTHSEX` are categorical variables. Apply labels with `factor()`. 
 
 The pivot longer to store `Smoke`, `Vape`,and `Smoke and Vape` in `Factor` with 
 values in `Prevalance`. This allows plotting by Factor in different colors.
@@ -375,23 +375,25 @@ values in `Prevalance`. This allows plotting by Factor in different colors.
 
 ```r
 age.labels <- c('18-24', '25-34', '35-44', '45-54', '55-64', '65+')
-consumers <- rs %>% group_by(`Age Group`) %>%
+consumers <- rs %>% group_by(`Age Group`, Gender) %>%
   mutate(`Smoke` = Smokers/Respondents,
          `Vape` = Vapers/Respondents,
          `Smoke or Vape` = sum(Smokers, Vapers, na.rm = TRUE)/Respondents,
          `Smoke and Vape` = SmokeAndVapers/Respondents,
          `Age Group` = factor(`Age Group`, levels = 1:6, labels = age.labels)) %>%
     pivot_longer(c(`Smoke`, `Vape`, `Smoke or Vape`, `Smoke and Vape`), 
-                 names_to = "Factor", values_to = "Prevalence")
+                 names_to = "Factor", values_to = "Prevalence") %>%
+  mutate(Gender = factor(Gender, levels = 2:1, labels = c("Female", "Male")))
 ```
 
-## Smoking and Vaping by Age in 2021
+## 2021 Smoking & Vaping by Age & Sex
 
 
 ```r
 ggplot(consumers, aes(x = `Age Group`, y = `Prevalence`, 
                     color = Factor, group = Factor)) + 
-  geom_line(linewidth = 1.5) + scale_color_manual(values = cbPalette)
+  geom_line() + scale_color_manual(values = cbPalette) + facet_wrap(. ~ Gender) +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
 ```
 
 ![](sql_examples_files/figure-html/unnamed-chunk-17-1.png)<!-- -->
@@ -658,6 +660,45 @@ ggplot(consumers, aes(x = Year, y = Prevalence, group = Factor, color = Factor))
 
 ![](sql_examples_files/figure-html/unnamed-chunk-31-1.png)<!-- -->
 
+## 2021 Drinking Amount by Age and Sex
+
+Using `dbplyr`, compare drinking frequency (`ALCDAY5`) and amount 
+(`AVEDRNK3`) by age group and sex at birth (`BIRTHSEX`) in 2021. Exclude 
+non-drinkers.
+
+
+```r
+drinkers <- tbl(con, "brfss2021") %>% 
+  select("Year" = IYEAR, "Age Group" = `_AGE_G`, DRNKANY5, 
+         "Gender" = BIRTHSEX, ALCDAY5, AVEDRNK3) %>%
+  filter(Year == 2021, DRNKANY5 == 1, Gender %in% 1:2) %>% collect(result) %>%
+  mutate(DaysPerMonth = 
+           case_when(ALCDAY5 >= 101 & ALCDAY5 <= 107 ~ (ALCDAY5 - 100) * (30/7),
+                     ALCDAY5 >= 201 & ALCDAY5 <= 230 ~ ALCDAY5 - 200,
+                     .default = 0)) %>% 
+  mutate(DrinksPerDay = 
+           case_when(AVEDRNK3 >= 1 & AVEDRNK3 <= 76 ~ AVEDRNK3,
+                     .default = 0)) %>% 
+  mutate(DrinksPerMonth = DrinksPerDay * DaysPerMonth) %>% 
+  group_by(Gender, `Age Group`) %>% 
+  summarize(across(c(DrinksPerDay, DrinksPerMonth), ~ mean(.x, na.rm = TRUE)),
+            .groups = "drop") %>% 
+  mutate(`Age Group` = factor(`Age Group`, levels = 1:6, labels = age.labels),
+         Gender = factor(Gender, levels = 2:1, labels = c("Female", "Male")))
+```
+
+## 2021 Drinking Amount by Age and Sex
+
+
+```r
+ggplot(drinkers, aes(x = `Age Group`, y = DrinksPerMonth, color = Gender)) + 
+  geom_point(aes(size = DrinksPerDay)) + ylab("Drinks per Month (30 days)") + 
+  guides(color = guide_legend(title = "Sex at Birth"),
+         size = guide_legend(title = "Drinks per \nDrinking Day"))
+```
+
+![](sql_examples_files/figure-html/unnamed-chunk-33-1.png)<!-- -->
+
 ## Speeding up Queries
 
 If we retrieve all of the data for Washington state respondents for 2012-2021,
@@ -752,7 +793,7 @@ ggplot(consumers, aes(x = Year, y = Prevalence, group = Factor, color = Factor))
     scale_color_manual(values = cbPalette)
 ```
 
-![](sql_examples_files/figure-html/unnamed-chunk-35-1.png)<!-- -->
+![](sql_examples_files/figure-html/unnamed-chunk-37-1.png)<!-- -->
 
 ## Compare States: Get FIPS Codes
 
@@ -848,7 +889,7 @@ ggplot(consumers, aes(x = Year, y = Prevalence, group = State, color = State)) +
     scale_color_manual(values = cbPalette)
 ```
 
-![](sql_examples_files/figure-html/unnamed-chunk-39-1.png)<!-- -->
+![](sql_examples_files/figure-html/unnamed-chunk-41-1.png)<!-- -->
 
 ## Smoking and Drinking by State and Age
 
@@ -889,7 +930,7 @@ ggplot(consumers,
   geom_line() + facet_grid(. ~ Factor)
 ```
 
-![](sql_examples_files/figure-html/unnamed-chunk-41-1.png)<!-- -->
+![](sql_examples_files/figure-html/unnamed-chunk-43-1.png)<!-- -->
 
 ## Compare other Variables
 
