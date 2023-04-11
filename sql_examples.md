@@ -282,7 +282,7 @@ FROM brfss
 WHERE (IYEAR BETWEEN 2012 AND 2021)
 AND _EDUCAG <= 4 
 GROUP BY IYEAR, _EDUCAG 
-ORDER BY IYEAR, _EDUCAG DESC;"
+ORDER BY IYEAR, _EDUCAG;"
 
 rs <- dbGetQuery(con, sql)
 smokers <- rs %>% group_by(Year, Education) %>% 
@@ -315,7 +315,7 @@ FROM brfss
 WHERE (IYEAR BETWEEN 2012 AND 2021)
 AND _EDUCAG <= 4 
 GROUP BY IYEAR, _EDUCAG 
-ORDER BY IYEAR, _EDUCAG DESC;"
+ORDER BY IYEAR, _EDUCAG;"
 
 rs <- dbGetQuery(con, sql)
 tobacco_use <- rs %>% group_by(Year, Education) %>% 
@@ -411,7 +411,7 @@ FROM brfss
 WHERE IYEAR = 2021
 AND _EDUCAG <= 4 
 GROUP BY _EDUCAG 
-ORDER BY _EDUCAG DESC;"
+ORDER BY _EDUCAG;"
 
 rs <- dbGetQuery(con, sql)
 ```
@@ -433,10 +433,10 @@ drinkers
 ## # Groups:   Education [4]
 ##   Education        Respondents Drinkers `Drinking Prevalence`
 ##   <fct>                  <dbl>    <dbl>                 <dbl>
-## 1 college grad          173407   100642                 0.580
-## 2 some college          117271    55338                 0.472
-## 3 high school grad      108779    41838                 0.385
-## 4 some school            25477     7044                 0.276
+## 1 some school            25477     7044                 0.276
+## 2 high school grad      108779    41838                 0.385
+## 3 some college          117271    55338                 0.472
+## 4 college grad          173407   100642                 0.580
 ```
 
 ## Drinking Prevalence by Education Level
@@ -464,7 +464,7 @@ FROM brfss
 WHERE (IYEAR BETWEEN 2012 AND 2021)
 AND _EDUCAG <= 4 
 GROUP BY IYEAR, _EDUCAG 
-ORDER BY IYEAR, _EDUCAG DESC;"
+ORDER BY IYEAR, _EDUCAG;"
 
 rs <- dbGetQuery(con, sql)
 drinkers <- rs %>% group_by(Year, Education) %>% 
@@ -501,7 +501,7 @@ FROM brfss
 WHERE (IYEAR BETWEEN 2012 AND 2021)
 AND _EDUCAG <= 4 
 GROUP BY IYEAR, _EDUCAG 
-ORDER BY IYEAR, _EDUCAG DESC;"
+ORDER BY IYEAR, _EDUCAG;"
 ```
 
 ## Drinkers and Binge Drinkers
