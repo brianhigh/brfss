@@ -53,7 +53,7 @@ Set `knitr` rendering options, the number of digits to display, and a palette.
 ```r
 opts_chunk$set(tidy=FALSE, cache=FALSE, fig.height=3.5)
 options(digits=4)
-cbPalette <- c("#CC79A7", "#D55E00", "#999999", "#0072B2", "#009E73")
+cbPalette <- c("#CC79A7", "#D55E00", "#999999", "#0072B2", "#009E73", "#E69F00")
 ```
 
 Connect to the DuckDB database file.
@@ -690,6 +690,67 @@ ggplot(drinkers, aes(x = `Age Group`, y = DrinksPerMonth, color = Gender)) +
 
 ![](sql_examples_files/figure-html/unnamed-chunk-33-1.png)<!-- -->
 
+## 2021 Drinking by Race and Income
+
+Using `dbplyr`, compare drinking frequency (`ALCDAY5`) and amount 
+(`AVEDRNK3`) by race (`_IMPRACE`) and income group (`_INCOMG1`) in 2021. Exclude 
+non-drinkers.
+
+
+```r
+income.levels <- c('<$15K', '$15K-$25K', '$25K-$35K', '$35K-$50K', 
+                   '$50K-$100K', '$100K-$200K', '$200K+')
+
+race.levels <- c('White, Non-Hispanic', 
+                 'Black, Non-Hispanic', 
+                 'Asian, Non-Hispanic ', 
+                 'American Indian/Alaskan Native, Non-Hispanic', 
+                 'Hispanic', 
+                 'Other race, Non-Hispanic')
+```
+
+## 2021 Drinking by Race and Income
+
+
+```r
+drinkers <- tbl(con, "brfss2021") %>% 
+  select("Year" = IYEAR, "Income Group" = `_INCOMG1`, DRNKANY5, 
+         "Race" = `_IMPRACE`, ALCDAY5, AVEDRNK3) %>%
+  filter(Year == 2021, DRNKANY5 == 1, `Income Group` <= 7) %>% collect(result) %>%
+  mutate(DaysPerMonth = 
+           case_when(ALCDAY5 >= 101 & ALCDAY5 <= 107 ~ (ALCDAY5 - 100) * (30/7),
+                     ALCDAY5 >= 201 & ALCDAY5 <= 230 ~ ALCDAY5 - 200,
+                     .default = NA)) %>% 
+  mutate(DrinksPerDay = 
+           case_when(AVEDRNK3 >= 1 & AVEDRNK3 <= 76 ~ AVEDRNK3,
+                     .default = NA)) %>% 
+  mutate(DrinksPerMonth = DrinksPerDay * DaysPerMonth) %>% 
+  group_by(Race, `Income Group`) %>% 
+  summarize(across(c(DrinksPerDay, DrinksPerMonth), ~ mean(.x, na.rm = TRUE)),
+            .groups = "drop") %>% 
+  mutate(`Income Group` = 
+           factor(`Income Group`, levels = 1:7, labels = income.levels),
+         Race = 
+           factor(Race, levels = 1:6, labels = race.levels))
+```
+
+## 2021 Drinking by Race and Income
+
+
+```r
+p <- ggplot(drinkers, aes(x = `Income Group`, y = DrinksPerMonth, color = Race)) + 
+  geom_point(aes(size = DrinksPerDay), alpha = 0.6) + 
+  ylab("Drinks per Month (30 days)") + 
+  guides(color = guide_legend(title = "Race"),
+         size = guide_legend(title = "Drinks per \nDrinking Day")) + 
+  scale_color_manual(values = cbPalette) + 
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
+```
+
+## 2021 Drinking by Race and Income
+
+![](sql_examples_files/figure-html/unnamed-chunk-37-1.png)<!-- -->
+
 ## Speeding up Queries
 
 If we retrieve all of the data for Washington state (state FIPS code = 53) respondents 
@@ -784,7 +845,7 @@ ggplot(consumers, aes(x = Year, y = Prevalence, group = Factor, color = Factor))
     scale_color_manual(values = cbPalette)
 ```
 
-![](sql_examples_files/figure-html/unnamed-chunk-37-1.png)<!-- -->
+![](sql_examples_files/figure-html/unnamed-chunk-41-1.png)<!-- -->
 
 ## Compare PNW States: Get FIPS Codes
 
@@ -880,7 +941,7 @@ ggplot(consumers, aes(x = Year, y = Prevalence, group = State, color = State)) +
     scale_color_manual(values = cbPalette)
 ```
 
-![](sql_examples_files/figure-html/unnamed-chunk-41-1.png)<!-- -->
+![](sql_examples_files/figure-html/unnamed-chunk-45-1.png)<!-- -->
 
 ## PNW Smoking and Drinking by State and Age
 
@@ -921,13 +982,12 @@ ggplot(consumers,
   geom_line() + facet_grid(. ~ Factor)
 ```
 
-![](sql_examples_files/figure-html/unnamed-chunk-43-1.png)<!-- -->
+![](sql_examples_files/figure-html/unnamed-chunk-47-1.png)<!-- -->
 
 ## Compare other Variables
 
 Now that you know how to query the database, compare other variables, such as:
 
-- Smoking and drinking with income (`_INCOMG`) or race (`_RACE`)
 - Smoking and drinking with cholesterol (`_RFCHOL3`) or heart disease (`_MICHD`) 
 - BMI category (`_BMI5CAT`) and exercise (`EXERANY2`) or sleep (`SLEPTIM1`)
 - Health care access (`HLTHPLN1`) and household income (`INCOME2`)
