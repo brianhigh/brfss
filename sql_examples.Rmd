@@ -30,12 +30,12 @@ We have downloaded the data for each respondent for the years 2012 through 2021.
 This dataset will be too large to fit in memory for most desktop and laptop 
 computers. When this entire dataset is loaded into memory as an R dataframe, it consumes almost 30 GB of RAM. As of 2023, most workstations have only 16 GB of RAM or less.
 
-Instead, we have [exported](download_brfss_into_duckdb.R) the data into a DuckDB database file. This allows access to just the data we need without loading all of it into memory at once. We have also limited the number of variables to only those present (359) in the first year's (2012) dataset.
+Instead, we have [exported](download_brfss_into_duckdb.R) the data into a DuckDB database file. This allows access to just the data we need without loading all of it into memory at once. We have also limited the number of variables to only those present (359) in the first year's (2012) dataset. For 2021, we will create a separate table with all of the 
+variables from that year, so we can look at some of the newer variables.
 
 The CDC has provided a 
 [codebook](https://www.cdc.gov/brfss/annual_data/2021/pdf/codebook21_llcp-v2-508.pdf) 
-for use in understanding variables and codes. In particular, we will focus on tobacco use and alcohol consumption in 
-the state of Washington.
+for use in understanding variables and codes. In particular, we will focus on tobacco use and alcohol consumption in the United States and the Pacific Nortwest (PNW) states (Alask, Idaho, Montana, Oregon, and Washington).
 
 ## Setup
 
@@ -79,13 +79,12 @@ cat(nrow(rs), "index(es)")
 
 ## Count Respondents by Year
 
-Let's count (`COUNT`) the number of respondents per year (`GROUP BY`) in 
-Washington state (`_STATE = 53`), sorting by year (`ORDER BY`).
+Let's count (`COUNT`) the number of respondents per year (`GROUP BY`), sorting 
+by year (`ORDER BY`).
 
 ```{r}
 sql <- "SELECT IYEAR AS Year, COUNT(*) AS Respondents 
         FROM brfss 
-        WHERE _STATE = 53 
         GROUP BY IYEAR 
         ORDER BY IYEAR;"
 dbGetQuery(con, sql)
@@ -98,7 +97,7 @@ Look at the number of respondents in 2021 and aggregate by education level.
 ```{r}
 sql <- "SELECT _EDUCAG AS Education, COUNT(*) AS Respondents 
         FROM brfss 
-        WHERE IYEAR = 2021 AND _STATE = 53 
+        WHERE IYEAR = 2021 
         GROUP BY _EDUCAG 
         ORDER BY _EDUCAG;"
 dbGetQuery(con, sql)
@@ -117,7 +116,7 @@ a "smoker" or not. A value of `1` (Every day) or `2` (Some days) means
 sql <- "SELECT _EDUCAG AS Education, 
 COUNT(SMOKDAY2) AS Smokers 
 FROM brfss 
-WHERE IYEAR = 2021 AND _STATE = 53 AND _EDUCAG <= 4 
+WHERE IYEAR = 2021 AND _EDUCAG <= 4 
 AND (SMOKDAY2 IN (1, 2)) 
 GROUP BY _EDUCAG 
 ORDER BY _EDUCAG;"
@@ -137,7 +136,7 @@ sql <- "SELECT _EDUCAG AS Education,
 COUNT(*) AS Respondents, 
 COUNT(IF(SMOKDAY2 IN (1, 2), 1, NULL)) AS Smokers 
 FROM brfss 
-WHERE IYEAR = 2021 AND _STATE = 53 AND _EDUCAG <= 4 
+WHERE IYEAR = 2021 AND _EDUCAG <= 4 
 GROUP BY _EDUCAG 
 ORDER BY _EDUCAG;"
 rs <- dbGetQuery(con, sql)
@@ -187,7 +186,6 @@ COUNT(IF(SMOKDAY2 IN (1, 2), 1, NULL)) AS Smokers,
 COUNT(IF(SMOKDAY2 = 3, 1, NULL)) AS NonSmokers 
 FROM brfss 
 WHERE (IYEAR BETWEEN 2012 AND 2021)
-AND _STATE = 53 
 AND _EDUCAG <= 4 
 GROUP BY IYEAR, _EDUCAG 
 ORDER BY IYEAR, _EDUCAG DESC;"
@@ -217,7 +215,6 @@ COUNT(IF(SMOKDAY2 IN (1, 2), 1, NULL)) AS Smokers,
 COUNT(IF(USENOW3 = 1 OR USENOW3 = 2, 1, NULL)) AS Chewers
 FROM brfss 
 WHERE (IYEAR BETWEEN 2012 AND 2021)
-AND _STATE = 53 
 AND _EDUCAG <= 4 
 GROUP BY IYEAR, _EDUCAG 
 ORDER BY IYEAR, _EDUCAG DESC;"
@@ -297,7 +294,7 @@ ggplot(consumers, aes(x = `Age Group`, y = `Prevalence`,
 The `DRNKANY5` variable stores a value indicating if the survey respondent has 
 consumed an alcoholic drink in the past 30 days. We will use this value to 
 indicate if the survey respondent is currently a "drinker" or not. A value of
-`1` means "is a drinker". Again, we will just look at Washington state in 2021.
+`1` means "is a drinker". Again, we will just look at 2021.
 
 ```{r}
 sql <- "SELECT _EDUCAG AS Education, 
@@ -305,7 +302,6 @@ COUNT(*) AS Respondents,
 COUNT(IF(DRNKANY5 = 1, 1, NULL)) AS Drinkers 
 FROM brfss 
 WHERE IYEAR = 2021
-AND _STATE = 53 
 AND _EDUCAG <= 4 
 GROUP BY _EDUCAG 
 ORDER BY _EDUCAG DESC;"
@@ -343,7 +339,6 @@ COUNT(IF(DRNKANY5 = 1, 1, NULL)) AS Drinkers,
 COUNT(IF(DRNKANY5 = 2, 1, NULL)) AS NonDrinkers 
 FROM brfss 
 WHERE (IYEAR BETWEEN 2012 AND 2021)
-AND _STATE = 53 
 AND _EDUCAG <= 4 
 GROUP BY IYEAR, _EDUCAG 
 ORDER BY IYEAR, _EDUCAG DESC;"
@@ -377,7 +372,6 @@ COUNT(IF(_RFBING5 = 2, 1, NULL)) AS BingeDrinkers,
 COUNT(IF(_RFBING5 = 1, 1, NULL)) AS NonBingeDrinkers 
 FROM brfss 
 WHERE (IYEAR BETWEEN 2012 AND 2021)
-AND _STATE = 53 
 AND _EDUCAG <= 4 
 GROUP BY IYEAR, _EDUCAG 
 ORDER BY IYEAR, _EDUCAG DESC;"
@@ -420,7 +414,7 @@ COUNT(IF(SMOKDAY2 = 3, 1, NULL)) AS NonSmokers,
 COUNT(IF(DRNKANY5 = 1, 1, NULL)) AS Drinkers,
 COUNT(IF(DRNKANY5 = 2, 1, NULL)) AS NonDrinkers
 FROM brfss 
-WHERE (IYEAR BETWEEN 2012 AND 2021) AND _STATE = 53 AND _EDUCAG <= 4 
+WHERE (IYEAR BETWEEN 2012 AND 2021) AND _EDUCAG <= 4 
 GROUP BY IYEAR, _EDUCAG 
 ORDER BY IYEAR, _EDUCAG;"
 
@@ -456,7 +450,7 @@ brfss_data <- tbl(con, "brfss")
 result <- brfss_data %>% 
   select("Year" = IYEAR, "Education" = `_EDUCAG`, State = `_STATE`, 
          SMOKDAY2, DRNKANY5) %>%
-  filter(Year >= 2012, Year <= 2021, State == 53, Education <= 4)
+  filter(Year >= 2012, Year <= 2021, Education <= 4)
 ```
 
 Don't do too much cleanup here, though. Just focus on selecting and filtering
@@ -493,7 +487,7 @@ consumers <- collect(result) %>%
                names_to = "Factor", values_to = "Prevalence")
 ```
 
-## Plot dbplyr Results
+## Smoking and Drinking Prevalence
 
 ```{r}
 # Use the same ggplot() command as before
@@ -540,8 +534,8 @@ ggplot(drinkers, aes(x = `Age Group`, y = DrinksPerMonth, color = Gender)) +
 
 ## Speeding up Queries
 
-If we retrieve all of the data for Washington state respondents for 2012-2021,
-we can just use R commands for subsetting and work entirely from memory.
+If we retrieve all of the data for Washington state (state FIPS code = 53) respondents 
+for 2012-2021, we can just use R commands for subsetting and work entirely from memory.
 
 ```{r message=FALSE}
 # Get all Washington State data from 2012-2021 from database as a dataframe
@@ -583,7 +577,7 @@ We can test our subset by reproducing our SQL query with R commands as before.
 consumers <- brfsswa1221 %>%
   select("Year" = IYEAR, "Education" = `_EDUCAG`, State = `_STATE`, 
          SMOKDAY2, DRNKANY5) %>%
-  filter(Year >= 2012, Year <= 2021, State == 53, Education <= 4) %>% 
+  filter(Year >= 2012, Year <= 2021, Education <= 4) %>% 
   mutate(Smoker = ifelse(SMOKDAY2 %in% 1:2, 1, 0)) %>% 
   mutate(NonSmoker = ifelse(SMOKDAY2 == 3, 1, 0)) %>% 
   mutate(Drinker = ifelse(DRNKANY5 == 1, 1, 0)) %>% 
@@ -598,7 +592,7 @@ consumers <- brfsswa1221 %>%
                names_to = "Factor", values_to = "Prevalence")
 ```
 
-## Smoking and Drinking Prevalence
+## WA Smoking and Drinking Prevalence
 
 ```{r}
 # Use the same ggplot() command as used earlier
@@ -608,7 +602,7 @@ ggplot(consumers, aes(x = Year, y = Prevalence, group = Factor, color = Factor))
     scale_color_manual(values = cbPalette)
 ```
 
-## Compare States: Get FIPS Codes
+## Compare PNW States: Get FIPS Codes
 
 We can easily compare states if we know the codes used in the BRFSS dataset. The
 codes are known as [FIPS codes](https://www.cdc.gov/brfss/annual_data/1996/files/fipscode.txt). We can 
@@ -635,7 +629,7 @@ pnw_states <- c("Alaska", "Idaho", "Montana", "Oregon", "Washington")
 pnw_state_fips <- fips %>% filter(state_name %in% pnw_states) %>% pull(state_fips)
 ```
 
-## Compare States: Count Respondents
+## Compare PNW States: Count Respondents
 
 To see these FIPS codes used in action, let's count the number of respondents 
 per PNW state for the 2012-2021 timespan.
@@ -650,7 +644,7 @@ result <- brfss_data %>% rename(State = `_STATE`, "Year" = IYEAR) %>%
 inner_join(fips, collect(result), by = c('state_fips' = 'State'))
 ```
 
-## Compare States: Prep for Plot
+## Compare PNW States: Prep for Plot
 
 ```{r}
 brfss_data <- tbl(con, "brfss")
@@ -677,7 +671,7 @@ consumers <- collect(result) %>%
   mutate(State = state_name) %>% select(-state_name)
 ```
 
-## Compare States: Plot
+## PNW Smoking and Drinking Prevalence
 
 ```{r}
 # Use the same ggplot() command as before, modified to color by state
@@ -687,7 +681,7 @@ ggplot(consumers, aes(x = Year, y = Prevalence, group = State, color = State)) +
     scale_color_manual(values = cbPalette)
 ```
 
-## Smoking and Drinking by State and Age
+## PNW Smoking and Drinking by State and Age
 
 Age group (`_AGE_G`) is a 6-level ordinal variable. Apply labels with `factor()`.
 
@@ -714,7 +708,7 @@ consumers <- tbl(con, "brfss") %>%
   mutate(`Age Group` = factor(`Age Group`, levels = 1:6, labels = age.labels))
 ```
 
-## Smoking and Drinking by State and Age
+## PNW Smoking and Drinking by State and Age
 
 Plot drinking and smoking prevalence by age group and state for 2012-2021.
 
