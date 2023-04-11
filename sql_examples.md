@@ -698,21 +698,6 @@ non-drinkers.
 
 
 ```r
-income.levels <- c('<$15K', '$15K-$25K', '$25K-$35K', '$35K-$50K', 
-                   '$50K-$100K', '$100K-$200K', '$200K+')
-
-race.levels <- c('White, Non-Hispanic', 
-                 'Black, Non-Hispanic', 
-                 'Asian, Non-Hispanic ', 
-                 'American Indian/Alaskan Native, Non-Hispanic', 
-                 'Hispanic', 
-                 'Other race, Non-Hispanic')
-```
-
-## 2021 Drinking by Race and Income
-
-
-```r
 drinkers <- tbl(con, "brfss2021") %>% 
   select("Year" = IYEAR, "Income Group" = `_INCOMG1`, DRNKANY5, 
          "Race" = `_IMPRACE`, ALCDAY5, AVEDRNK3) %>%
@@ -727,18 +712,26 @@ drinkers <- tbl(con, "brfss2021") %>%
   mutate(DrinksPerMonth = DrinksPerDay * DaysPerMonth) %>% 
   group_by(Race, `Income Group`) %>% 
   summarize(across(c(DrinksPerDay, DrinksPerMonth), ~ mean(.x, na.rm = TRUE)),
-            .groups = "drop") %>% 
-  mutate(`Income Group` = 
-           factor(`Income Group`, levels = 1:7, labels = income.levels, 
-                  ordered = TRUE),
-         Race = 
-           factor(Race, levels = 1:6, labels = race.levels))
+            .groups = "drop") 
 ```
 
 ## 2021 Drinking by Race and Income
 
 
 ```r
+income.labels <- c('<$15K', '$15K-$25K', '$25K-$35K', '$35K-$50K', 
+                   '$50K-$100K', '$100K-$200K', '$200K+')
+
+race.labels <- 
+  c('White, Non-Hispanic', 'Black, Non-Hispanic', 'Asian, Non-Hispanic ', 
+    'American Indian/Alaskan Native, Non-Hispanic', 'Hispanic', 
+    'Other race, Non-Hispanic')
+
+drinkers <- drinkers %>% 
+  mutate(`Income Group` = factor(`Income Group`, levels = 1:7, 
+                                 labels = income.labels, ordered = TRUE),
+         Race = factor(Race, levels = 1:6, labels = race.labels))
+
 p <- ggplot(drinkers, aes(x = `Income Group`, y = DrinksPerMonth, 
                           color = Race, group = Race)) + 
   geom_line(aes(linewidth = DrinksPerDay), alpha = 0.5, show.legend = FALSE) + 
@@ -752,7 +745,7 @@ p <- ggplot(drinkers, aes(x = `Income Group`, y = DrinksPerMonth,
 
 ## 2021 Drinking by Race and Income
 
-![](sql_examples_files/figure-html/unnamed-chunk-37-1.png)<!-- -->
+![](sql_examples_files/figure-html/unnamed-chunk-36-1.png)<!-- -->
 
 ## Speeding up Queries
 
@@ -848,7 +841,7 @@ ggplot(consumers, aes(x = Year, y = Prevalence, group = Factor, color = Factor))
     scale_color_manual(values = cbPalette)
 ```
 
-![](sql_examples_files/figure-html/unnamed-chunk-41-1.png)<!-- -->
+![](sql_examples_files/figure-html/unnamed-chunk-40-1.png)<!-- -->
 
 ## Compare PNW States: Get FIPS Codes
 
@@ -944,7 +937,7 @@ ggplot(consumers, aes(x = Year, y = Prevalence, group = State, color = State)) +
     scale_color_manual(values = cbPalette)
 ```
 
-![](sql_examples_files/figure-html/unnamed-chunk-45-1.png)<!-- -->
+![](sql_examples_files/figure-html/unnamed-chunk-44-1.png)<!-- -->
 
 ## PNW Smoking and Drinking by State and Age
 
@@ -985,7 +978,7 @@ ggplot(consumers,
   geom_line() + facet_grid(. ~ Factor)
 ```
 
-![](sql_examples_files/figure-html/unnamed-chunk-47-1.png)<!-- -->
+![](sql_examples_files/figure-html/unnamed-chunk-46-1.png)<!-- -->
 
 ## Compare other Variables
 
