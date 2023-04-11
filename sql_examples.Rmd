@@ -253,6 +253,7 @@ sql <- 'SELECT _AGE_G AS "Age Group", BIRTHSEX AS Gender,
 COUNT(*) AS Respondents, 
 COUNT(IF(SMOKDAY2 IN (1, 2), 1, NULL)) AS Smokers,
 COUNT(IF(ECIGNOW1 IN (1, 2), 1, NULL)) AS Vapers, 
+COUNT(IF((SMOKDAY2 IN (1, 2)) OR (ECIGNOW1 IN (1, 2)), 1, NULL)) AS SmokeOrVapers,
 COUNT(IF((SMOKDAY2 IN (1, 2)) AND (ECIGNOW1 IN (1, 2)), 1, NULL)) AS SmokeAndVapers, 
 FROM brfss2021 WHERE IYEAR = 2021 AND (Gender IN (1, 2)) 
 GROUP BY _AGE_G, BIRTHSEX ORDER BY _AGE_G, BIRTHSEX;'
@@ -272,7 +273,7 @@ age.labels <- c('18-24', '25-34', '35-44', '45-54', '55-64', '65+')
 consumers <- rs %>% group_by(`Age Group`, Gender) %>%
   mutate(`Smoke` = Smokers/Respondents,
          `Vape` = Vapers/Respondents,
-         `Smoke or Vape` = sum(Smokers, Vapers, na.rm = TRUE)/Respondents,
+         `Smoke or Vape` = SmokeOrVapers/Respondents,
          `Smoke and Vape` = SmokeAndVapers/Respondents,
          `Age Group` = factor(`Age Group`, levels = 1:6, labels = age.labels)) %>%
     pivot_longer(c(`Smoke`, `Vape`, `Smoke or Vape`, `Smoke and Vape`), 
