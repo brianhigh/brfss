@@ -729,7 +729,8 @@ drinkers <- tbl(con, "brfss2021") %>%
   summarize(across(c(DrinksPerDay, DrinksPerMonth), ~ mean(.x, na.rm = TRUE)),
             .groups = "drop") %>% 
   mutate(`Income Group` = 
-           factor(`Income Group`, levels = 1:7, labels = income.levels),
+           factor(`Income Group`, levels = 1:7, labels = income.levels, 
+                  ordered = TRUE),
          Race = 
            factor(Race, levels = 1:6, labels = race.levels))
 ```
@@ -738,10 +739,12 @@ drinkers <- tbl(con, "brfss2021") %>%
 
 
 ```r
-p <- ggplot(drinkers, aes(x = `Income Group`, y = DrinksPerMonth, color = Race)) + 
-  geom_point(aes(size = DrinksPerDay), alpha = 0.6) + 
+p <- ggplot(drinkers, aes(x = `Income Group`, y = DrinksPerMonth, 
+                          color = Race, group = Race)) + 
+  geom_line(aes(linewidth = DrinksPerDay), alpha = 0.5, show.legend = FALSE) + 
+  geom_point(aes(size = DrinksPerDay), alpha = 0.5) + 
   ylab("Drinks per Month (30 days)") + 
-  guides(color = guide_legend(title = "Race"),
+  guides(color = guide_legend(title = "Race", override.aes = list(size = 3)),
          size = guide_legend(title = "Drinks per \nDrinking Day")) + 
   scale_color_manual(values = cbPalette) + 
   theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
