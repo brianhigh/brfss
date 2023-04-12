@@ -35,7 +35,9 @@ variables from that year, so we can look at some of the newer variables.
 
 The CDC has provided a 
 [codebook](https://www.cdc.gov/brfss/annual_data/2021/pdf/codebook21_llcp-v2-508.pdf) 
-for use in understanding variables and codes. In particular, we will focus on tobacco use and alcohol consumption in the United States and the Pacific Nortwest (PNW) states (Alask, Idaho, Montana, Oregon, and Washington).
+for use in understanding variables and codes. In particular, we will focus on tobacco, 
+marijuana, and alcohol use in the United States and the Pacific Nortwest (PNW) 
+states (Alask, Idaho, Montana, Oregon, and Washington).
 
 ## Setup
 
@@ -373,6 +375,7 @@ with values in `Prevalance`. This allows plotting by Factor in different colors.
 
 ```r
 age.labels <- c('18-24', '25-34', '35-44', '45-54', '55-64', '65+')
+
 consumers <- rs %>% group_by(`Age Group`, Gender) %>%
   mutate(`Smoke` = Smokers/Respondents,
          `Vape` = Vapers/Respondents,
@@ -395,6 +398,87 @@ ggplot(consumers, aes(x = `Age Group`, y = `Prevalence`,
 ```
 
 ![](sql_examples_files/figure-html/unnamed-chunk-17-1.png)<!-- -->
+
+## 2021 Marijuana Use by Age & Sex
+
+We will use a line plot to compare the proportion of marijuana users by usage type 
+(`RSNMRJN2`) by age group (`_AGE_G`) and birth sex (`BIRTHSEX`) for 2021.
+
+
+```r
+sql <- 'SELECT _AGE_G AS "Age Group", BIRTHSEX AS Gender, RSNMRJN2, MARIJAN1
+FROM brfss2021 WHERE IYEAR = 2021 AND (Gender IN (1, 2));'
+
+rs <- dbGetQuery(con, sql)
+```
+
+This time, we will count respondents and marijuana users in R. Although that 
+means reading more data into memory, at allows us to more easily handle the 
+mix of counts (for prevalence) and averages (days of use) that we will need.
+
+
+```r
+respondents <- rs %>% group_by(`Age Group`, Gender) %>% 
+  summarise(Respondents = n(), .groups = "drop")
+
+mj.use.counts <- rs %>% filter(RSNMRJN2 %in% 1:3) %>% 
+  group_by(`Age Group`, Gender, RSNMRJN2) %>% 
+  summarise(Users = n(), .groups = "drop")
+```
+
+## 2021 Marijuana Use by Age & Sex
+
+Now we merge in the respondent and user counts with the mean monthly usage values.
+
+
+```r
+consumers <- rs %>% 
+  filter(RSNMRJN2 %in% 1:3, MARIJAN1 >= 1 & MARIJAN1 <= 30) %>%
+  group_by(`Age Group`, Gender, RSNMRJN2) %>% 
+  summarise(MARIJAN1 = mean(MARIJAN1, na.rm = TRUE), .groups = "drop") %>% 
+  left_join(respondents, by = c('Age Group', 'Gender')) %>%
+  left_join(mj.use.counts, by = c('Age Group', 'Gender', 'RSNMRJN2'))
+```
+
+Variables `_AGE_G`, `BIRTHSEX`, and `RSNMRJN2` are categorical, so apply labels 
+with `factor()`.
+
+
+```r
+mj.use.labels <- c('Medical', 'Non-medical', 'Both Medical and \nNon-medical')
+
+consumers <- consumers %>% 
+  mutate(Prevalence = Users/Respondents,
+         RSNMRJN2 = factor(RSNMRJN2, levels = 1:3, labels = mj.use.labels),
+         `Age Group` = factor(`Age Group`, levels = 1:6, labels = age.labels),
+         Gender = factor(Gender, levels = 2:1, labels = c("Female", "Male"))) %>% 
+  rename("Use Type" = RSNMRJN2, "DaysPerMonth" = MARIJAN1)
+```
+
+## 2021 Marijuana Use by Age & Sex
+
+We will plot Prevalence by Age Group as we have done earlier, and color by Use Type, 
+but this time we will make the size of the points/circles relative to the mean 
+monthly use per group/type. Since the points become jumbled together with 
+increasing age, we will also add lines with the points, using the same group 
+colors. We will reduce the opacity (`alpha`) because the lines and points cross 
+and overlap.
+
+
+```r
+p <- ggplot(consumers, aes(x = `Age Group`, y = `Prevalence`, 
+                      color = `Use Type`, group = `Use Type`)) + 
+  geom_line(alpha = 0.7, show.legend = FALSE) + 
+  geom_point(aes(size = DaysPerMonth), alpha = 0.5) + 
+  guides(color = guide_legend(title = "Use Type", override.aes = list(size = 3)),
+         size = guide_legend(title = "Average Days Used \nper Month (30 days)")) + 
+  scale_color_manual(values = cbPalette) + facet_wrap(. ~ Gender) + 
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
+```
+
+## 2021 Marijuana Use by Age & Sex
+
+![](sql_examples_files/figure-html/unnamed-chunk-23-1.png)<!-- -->
 
 ## Count Drinkers by Education Level
 
@@ -448,7 +532,7 @@ ggplot(drinkers, aes(x = Education, y = `Drinking Prevalence`, fill = Education)
   geom_bar(stat = "identity")
 ```
 
-![](sql_examples_files/figure-html/unnamed-chunk-20-1.png)<!-- -->
+![](sql_examples_files/figure-html/unnamed-chunk-26-1.png)<!-- -->
 
 ## Count Drinkers by Education and Year
 
@@ -482,7 +566,7 @@ ggplot(drinkers, aes(x = Year, y = `Drinking Prevalence`,
                      color = Education, group = Education)) + geom_line()
 ```
 
-![](sql_examples_files/figure-html/unnamed-chunk-22-1.png)<!-- -->
+![](sql_examples_files/figure-html/unnamed-chunk-28-1.png)<!-- -->
 
 ## Drinkers and Binge Drinkers
 
@@ -533,7 +617,7 @@ ggplot(drinkers, aes(x = Year, y = Prevalence,
   theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
 ```
 
-![](sql_examples_files/figure-html/unnamed-chunk-25-1.png)<!-- -->
+![](sql_examples_files/figure-html/unnamed-chunk-31-1.png)<!-- -->
 
 ## Smoking and Drinking Prevalence
 
@@ -571,7 +655,7 @@ ggplot(consumers, aes(x = Year, y = Prevalence, group = Factor, color = Factor))
     scale_color_manual(values = cbPalette)
 ```
 
-![](sql_examples_files/figure-html/unnamed-chunk-27-1.png)<!-- -->
+![](sql_examples_files/figure-html/unnamed-chunk-33-1.png)<!-- -->
 
 ## Alternative to Writing SQL
 
@@ -649,9 +733,9 @@ ggplot(consumers, aes(x = Year, y = Prevalence, group = Factor, color = Factor))
     scale_color_manual(values = cbPalette)
 ```
 
-![](sql_examples_files/figure-html/unnamed-chunk-31-1.png)<!-- -->
+![](sql_examples_files/figure-html/unnamed-chunk-37-1.png)<!-- -->
 
-## 2021 Drinking Amount by Age and Sex
+## 2021 Drinking Amount by Age & Sex
 
 Using `dbplyr`, compare drinking frequency (`ALCDAY5`) and amount 
 (`AVEDRNK3`) by age group and sex at birth (`BIRTHSEX`) in 2021. Exclude 
@@ -678,7 +762,7 @@ drinkers <- tbl(con, "brfss2021") %>%
          Gender = factor(Gender, levels = 2:1, labels = c("Female", "Male")))
 ```
 
-## 2021 Drinking Amount by Age and Sex
+## 2021 Drinking Amount by Age & Sex
 
 
 ```r
@@ -688,7 +772,7 @@ ggplot(drinkers, aes(x = `Age Group`, y = DrinksPerMonth, color = Gender)) +
          size = guide_legend(title = "Drinks per \nDrinking Day"))
 ```
 
-![](sql_examples_files/figure-html/unnamed-chunk-33-1.png)<!-- -->
+![](sql_examples_files/figure-html/unnamed-chunk-39-1.png)<!-- -->
 
 ## 2021 Drinking by Race and Income
 
@@ -734,7 +818,7 @@ drinkers <- drinkers %>%
 
 p <- ggplot(drinkers, aes(x = `Income Group`, y = DrinksPerMonth, 
                           color = Race, group = Race)) + 
-  geom_line(aes(linewidth = DrinksPerDay), alpha = 0.5, show.legend = FALSE) + 
+  geom_line(alpha = 0.5, show.legend = FALSE) + 
   geom_point(aes(size = DrinksPerDay), alpha = 0.5) + 
   ylab("Drinks per Month (30 days)") + 
   guides(color = guide_legend(title = "Race", override.aes = list(size = 3)),
@@ -745,7 +829,7 @@ p <- ggplot(drinkers, aes(x = `Income Group`, y = DrinksPerMonth,
 
 ## 2021 Drinking by Race and Income
 
-![](sql_examples_files/figure-html/unnamed-chunk-36-1.png)<!-- -->
+![](sql_examples_files/figure-html/unnamed-chunk-42-1.png)<!-- -->
 
 ## Speeding up Queries
 
@@ -841,7 +925,7 @@ ggplot(consumers, aes(x = Year, y = Prevalence, group = Factor, color = Factor))
     scale_color_manual(values = cbPalette)
 ```
 
-![](sql_examples_files/figure-html/unnamed-chunk-40-1.png)<!-- -->
+![](sql_examples_files/figure-html/unnamed-chunk-46-1.png)<!-- -->
 
 ## Compare PNW States: Get FIPS Codes
 
@@ -871,7 +955,7 @@ pnw_states <- c("Alaska", "Idaho", "Montana", "Oregon", "Washington")
 pnw_state_fips <- fips %>% filter(state_name %in% pnw_states) %>% pull(state_fips)
 ```
 
-## Compare PNW States: Count Respondents
+## Compare PNW States: Respondents
 
 To see these FIPS codes used in action, let's count the number of respondents 
 per PNW state for the 2012-2021 timespan.
@@ -937,9 +1021,9 @@ ggplot(consumers, aes(x = Year, y = Prevalence, group = State, color = State)) +
     scale_color_manual(values = cbPalette)
 ```
 
-![](sql_examples_files/figure-html/unnamed-chunk-44-1.png)<!-- -->
+![](sql_examples_files/figure-html/unnamed-chunk-50-1.png)<!-- -->
 
-## PNW Smoking and Drinking by State and Age
+## PNW Smoking and Drinking Prevalence
 
 Age group (`_AGE_G`) is a 6-level ordinal variable. Apply labels with `factor()`.
 
@@ -967,7 +1051,7 @@ consumers <- tbl(con, "brfss") %>%
   mutate(`Age Group` = factor(`Age Group`, levels = 1:6, labels = age.labels))
 ```
 
-## PNW Smoking and Drinking by State and Age
+## PNW Smoking and Drinking Prevalence
 
 Plot drinking and smoking prevalence by age group and state for 2012-2021.
 
@@ -978,7 +1062,47 @@ ggplot(consumers,
   geom_line() + facet_grid(. ~ Factor)
 ```
 
-![](sql_examples_files/figure-html/unnamed-chunk-46-1.png)<!-- -->
+![](sql_examples_files/figure-html/unnamed-chunk-52-1.png)<!-- -->
+
+## 2021 PNW Marijuana Use
+
+Let's compare marijuana usage by education and state in 2021 for Alaska, Idaho, 
+and Montana. (We do not have data on this for Oregon and Washington.)
+
+
+```r
+sql <- 'SELECT IYEAR, _STATE AS State, _EDUCAG AS Education, 
+AVG(IF(MARIJAN1 BETWEEN 1 AND 30, MARIJAN1, NULL)) AS DaysPerMonth, 
+COUNT(IF(MARIJAN1 BETWEEN 1 AND 30, 1, NULL)) AS Users, 
+COUNT(IF(MARIJAN1 = 88, 1, NULL)) AS NonUsers 
+FROM brfss2021 
+WHERE (IYEAR = 2021) AND _EDUCAG <= 4 
+GROUP BY State, IYEAR, _EDUCAG 
+ORDER BY State, IYEAR, _EDUCAG;'
+
+rs <- dbGetQuery(con, sql)
+
+users <- rs %>% filter(State %in% pnw_state_fips) %>% 
+  inner_join(fips, by = c('State' = 'state_fips')) %>% 
+  mutate(State = state_name) %>% select(-state_name) %>%
+  drop_na(DaysPerMonth ) %>% group_by(State, Education) %>% 
+    mutate(`Prevalence` = Users/sum(Users, NonUsers, na.rm = TRUE),
+           Education = factor(Education, levels = 1:4, labels = edu.labels))
+```
+
+## 2021 PNW Marijuana Use
+
+
+```r
+ggplot(users, aes(x = Education, y = `Prevalence`, 
+                    color = State, group = State)) + 
+  geom_line(alpha = 0.7, show.legend = FALSE) + 
+  geom_point(aes(size = DaysPerMonth), alpha = 0.5) + 
+  guides(color = guide_legend(title = "State", override.aes = list(size = 3)),
+         size = guide_legend(title = "Days of Use \nper Month"))
+```
+
+![](sql_examples_files/figure-html/message-1.png)<!-- -->
 
 ## Compare other Variables
 
