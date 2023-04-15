@@ -4,7 +4,8 @@
 # to run. The DuckDB file it creates will be about 1.4 GB without indexing and
 # 1.7 GB with indexing. The size of the file can grow over time as DuckDB adds 
 # more indexes to improve performance. After running "sql_examples.Rmd", the 
-# file may grow to 1.9 GB or more.
+# file may grow to 1.9 GB or more. Adding the brfss2021 table, the file size 
+# file may grow to 2.4GB.
 
 # Attach packages, installing as needed
 if(!requireNamespace("pacman", quietly = TRUE)) install.packages("pacman")
